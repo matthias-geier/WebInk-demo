@@ -91,7 +91,11 @@ module Ink
         self.class.fields.each do |k,v|
           raise NameError.new("Model cannot use #{k} as field, it already exists") if self.class.respond_to? k or k.to_s.downcase == "pk"
           raise LoadError.new("Model cannot be loaded, argument missing") if not data[k.to_s] and self.class.primary_key[0] != k
-          eval "@#{k} = #{(data[k.to_s].is_a?(Numeric)) ? data[k.to_s] : "\'#{data[k.to_s]}\'"}"
+          begin
+            eval "@#{k} = #{(data[k.to_s].is_a?(Numeric)) ? data[k.to_s] : "\'#{data[k.to_s]}\'"}"
+          rescue Exception => bang
+            eval "@#{k} = #{(data[k.to_s].is_a?(Numeric)) ? data[k.to_s] : "\'#{data[k.to_s].gsub(/'/, '&#39;')}\'"}"
+          end
           self.class.send(:define_method, k) do
             instance_variable_get "@#{k}"
           end
@@ -177,8 +181,10 @@ module Ink
     # All links between models will be removed also.
     def delete
       raise NotImplementedError.new("Cannot delete from Database without field definitions") if not self.class.respond_to? :fields
-      self.class.foreign.each do |k,v|
-        Ink::Database.database.delete_all_links self, Ink::Model.classname(k), v
+      if self.class.respond_to? :foreign
+        self.class.foreign.each do |k,v|
+          Ink::Database.database.delete_all_links self, Ink::Model.classname(k), v
+        end
       end
       
       pkvalue = eval "@#{self.class.primary_key[0]}"

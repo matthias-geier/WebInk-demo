@@ -314,7 +314,6 @@ module Ink
         secondclass = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? link : instance.class
         key = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? instance.class.primary_key[0] : instance.class.foreign_key[0]
         value = eval "instance.#{instance.class.primary_key[0]}"
-        puts "UPDATE #{Ink::Model.str_to_tablename(firstclass.name)} SET #{secondclass.foreign_key[0]}=NULL WHERE #{key}=#{value};"
         @db.query "UPDATE #{Ink::Model.str_to_tablename(firstclass.name)} SET #{secondclass.foreign_key[0]}=NULL WHERE #{key}=#{value};"
       elsif type == "one_many" or type == "many_one"
         firstclass = (type == "one_many") ? instance.class : link
@@ -383,7 +382,6 @@ module Ink
         value = eval "instance.#{instance.class.primary_key[0]}"
         fk_set = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? fk : value
         value_set = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? value : fk
-        puts "UPDATE #{Ink::Model.str_to_tablename(firstclass.name)} SET #{secondclass.foreign_key[0]}=#{fk} WHERE #{key}=#{value};"
         @db.query "UPDATE #{Ink::Model.str_to_tablename(firstclass.name)} SET #{secondclass.foreign_key[0]}=#{fk} WHERE #{key}=#{value};"
       elsif type == "one_many" or type == "many_one"
         firstclass = (type == "one_many") ? instance.class : link

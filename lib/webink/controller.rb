@@ -149,19 +149,31 @@ module Ink
     # [param args:] Hash of arguments
     # [returns:] interpreted erb instance or nil
     def redirect_to(args)
-      p = {:get => @params[:get], :config => @params[:config], :time => @params[:time]}
-      p[:post] = @params[:post] if @params.has_key? :post
+      #p = {:get => @params[:get], :config => @params[:config], :time => @params[:time], :root => @params[:root], :cgi => @params[:cgi]}
+      #p[:post] = @params[:post] if @params.has_key? :post
+      p = Hash.new
+      @params.each do |k,v|
+        p[k] = v
+      end
       args.each do |k,v|
         p[k] = v
       end
       if p[:controller] and p[:module]
-        controller = (Ink::Controller.verify p[:controller]).new @params
+        controller = (Ink::Controller.verify p[:controller]).new p
         (controller.verify p[:module]).call
       else
         nil
       end
     end
     
+    # Instance method
+    #
+    # Creates a dynamic hyperlink
+    # First argument is the name, then follow the pieces that are imploded by
+    # a /, followed by hashes, that become attributes.
+    # Convenience method
+    # [param args:] Array of Strings and Hashes
+    # [returns:] Hyperlink
     def link_to(*args)
       raise ArgumentError.new("Expects an array.") if not args.instance_of? Array and args.length < 2
       href = "#{@params[:root]}#{(@params[:root][@params[:root].length-1].chr == "/") ? "" : "/"}" if @params[:root].length > 0
@@ -179,6 +191,28 @@ module Ink
         end
       end
       "#{a}href=\"#{href}\">#{name}</a>"
+    end
+    
+    # Instance method
+    #
+    # Creates a dynamic path
+    # The array pieces are imploded by a /.
+    # Convenience method
+    # [param args:] Array of Strings or String
+    # [returns:] path
+    def path_to(*args)
+      href = "#{@params[:root]}#{(@params[:root][@params[:root].length-1].chr == "/") ? "" : "/"}" if @params[:root].length > 0
+      href = "/" if @params[:root].length == 0
+      
+      if args.is_a? Array
+        for i in 0...args.length
+          arg = args[i]
+          href += "#{arg}/"
+        end
+      else
+        href += "#{args}/"
+      end
+      href
     end
     
     # Instance method
