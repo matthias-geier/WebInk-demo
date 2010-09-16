@@ -39,7 +39,8 @@ module Ink
   # you should add it to the argument string. Rendering returns an
   # interpreted erb instance, which is returned to the calling part of
   # the script, which runs the erb instance. Redirecting forwards
-  # an erb instance, so multiple redirecting works.
+  # an erb instance and passes on the existing @params, after overwriting
+  # and setting its hash arguments, so multiple redirecting works.
   #
   # The template is called inside the binding on the controller, which
   # means that all instance variables and methods are available as such.
@@ -170,7 +171,8 @@ module Ink
     #
     # Creates a dynamic hyperlink
     # First argument is the name, then follow the pieces that are imploded by
-    # a /, followed by hashes, that become attributes.
+    # a /, followed by hashes, that become attributes. It adds the @session_key
+    # and @session_id if they are set.
     # Convenience method
     # [param args:] Array of Strings and Hashes
     # [returns:] Hyperlink
@@ -190,13 +192,15 @@ module Ink
           end
         end
       end
+      href += "?#{@session_key}=#{@session_id}" if @session_id and @session_key
       "#{a}href=\"#{href}\">#{name}</a>"
     end
     
     # Instance method
     #
     # Creates a dynamic path
-    # The array pieces are imploded by a /.
+    # The array pieces are imploded by a /. It adds the @session_key
+    # and @session_id if they are set.
     # Convenience method
     # [param args:] Array of Strings or String
     # [returns:] path
@@ -212,6 +216,7 @@ module Ink
       else
         href += "#{args}/"
       end
+      href += "?#{@session_key}=#{@session_id}" if @session_id and @session_key
       href
     end
     

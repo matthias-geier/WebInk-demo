@@ -40,6 +40,13 @@ module Ink
   # remove all references. This works both ways, just consider the
   # relationship type, as an apple cannot have more than one tree.
   #
+  #   treeinstance.delete
+  #
+  # The model provides a convenience method for deletion. It removes all
+  # references from relationships, but does not remove the relationships
+  # themselves, so you must fetch all related data, and delete them by
+  # 'hand' if you will.
+  #
   #
   # = Fields and foreign sample config
   # 

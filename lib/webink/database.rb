@@ -27,23 +27,24 @@ module Ink
   #
   # == Usage
   #
-  # Create an Ink::Database instance and pass the config along.
+  # Create an Ink::Database instance with the self.create class method.
+  # Now it can be accessed via the public class variable 'database'.
   # Once that is done, can use it to execute various SQL statements
   # to gather data.
   #
-  #   dbinstance.query "SELECT * FROM x;"
+  #   Ink::Database.database.query "SELECT * FROM x;"
   #
   # This is the most basic query, it returns an Array of results,
   # and each element contains a Hash of column_name => column_entry.
   #
-  #   dbinstance.find "apples", "WHERE id < 10 GROUP BY color"
+  #   Ink::Database.database.find "apples", "WHERE id < 10 GROUP BY color"
   #   => self.query("SELECT * FROM apples WHERE id < 10 GROUP BY color;")
   #
   # This is different from the query method, because it returns an Array
   # of Objects, created by the information stored in the database. So this
   # find() will return you a set of Apple-instances.
   #
-  #   dbinstance.find_union "apple", 5, "tree", ""
+  #   Ink::Database.database.find_union "apple", 5, "tree", ""
   #
   # find_union allows you to retrieve data through a many_many reference.
   # When you define a many_many relationship, a helper-table is created
@@ -53,7 +54,7 @@ module Ink
   # by the alphabetically first, and then second classname. The last quotes
   # allow additional query informations to be passed along (like group by)
   #
-  #   dbinstance.find_reference "tree", 1, "apple", ""
+  #   Ink::Database.database.find_reference "tree", 1, "apple", ""
   #
   # find_reference is similar to find_union, only that it handles all
   # other relationships. This statement above requires one Tree to have many
