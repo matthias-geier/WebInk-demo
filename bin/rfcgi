@@ -1,0 +1,109 @@
+#!/home/mayutamano/ruby1.8/bin/ruby
+require "fcgi"
+require "mmap"
+require "webink/beauty"
+
+def getBinding(cgi,env,params)
+  return binding
+end
+
+script = nil
+fhandle = nil
+control = nil
+pram = nil
+FCGI.each_cgi do |cgi|
+  time = Time.now
+  script = cgi.env_table['SCRIPT_FILENAME']
+  begin
+    pram = CGI::parse(cgi.env_table['QUERY_STRING'].gsub(/\?/, "&"))
+    control = pram['controller'][0]
+    routes = Ink::Beauty.load_routes script
+    fhandle = Mmap.new(routes, "r")
+    Dir.chdir( File.dirname(routes) )
+    control = eval fhandle, getBinding(cgi,cgi.env_table,control) if fhandle
+    fhandle.munmap
+    raise StandardError.new("Routes not matched.") if control.keys.length <= 1
+    
+    if cgi.env_table['REQUEST_METHOD'] == 'POST'
+      control[:post] = Hash.new
+      cgi.params.each do |k,v|
+        puts v.class
+        if v.is_a? Array
+          control[:post][k] = Array.new
+          v.each do |a|
+            control[:post][k].push CGI::escapeHTML(a)
+          end
+          control[:post][k] = control[:post][k].to_s
+        else
+          control[:post][k] = CGI::escapeHTML(v)
+        end
+      end
+    end
+    control[:get] = pram
+    control[:config] = Ink::Beauty.load_config script
+    control[:time] = time
+    control[:cgi] = cgi
+    
+    script = Ink::Beauty.load_init script
+    fhandle = Mmap.new(script, "r")
+    Dir.chdir( File.dirname(script) )
+    eval fhandle, getBinding(cgi,cgi.env_table,control) if fhandle
+    fhandle.munmap
+    
+    
+  rescue LoadError => bang
+    if control and control[:config] and not control[:config]["production"]
+      puts cgi.header({"Location" => "/status-404.html"});
+    else
+      puts cgi.header
+      puts "<hr><b>LoadError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
+    end
+    
+  rescue NotImplementedError => bang
+    if control and control[:config] and not control[:config]["production"]
+      puts cgi.header({"Location" => "/status-500.html"});
+    else
+      puts cgi.header
+      puts "<hr><b>NotImplementedError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
+    end
+    
+  rescue ArgumentError => bang
+    if control and control[:config] and not control[:config]["production"]
+      puts cgi.header({"Location" => "/status-500.html"});
+    else
+      puts cgi.header
+      puts "<hr><b>ArgumentError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
+    end
+    
+  rescue RuntimeError => bang
+    if control and control[:config] and not control[:config]["production"]
+      puts cgi.header({"Location" => "/status-500.html"});
+    else
+      puts cgi.header
+      puts "<hr><b>RuntimeError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
+    end
+  
+  rescue NameError => bang
+    if control and control[:config] and not control[:config]["production"]
+      puts cgi.header({"Location" => "/status-500.html"});
+    else
+      puts cgi.header
+      puts "<hr><b>NameError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
+    end
+    
+  rescue Exception, StandardError => bang
+    if control and control[:config] and not control[:config]["production"]
+      puts cgi.header({"Location" => "/status-500.html"});
+    else
+      puts cgi.header
+      puts "<hr><b>Exception:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
+    end
+  end
+  
+  script = nil
+  fhandle = nil
+  control = nil
+  pram = nil
+  GC.start
+end
+
