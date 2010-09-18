@@ -77,14 +77,14 @@ module Ink
     # possible.
     # [param config:] Hash of config parameters
     def initialize(config)
+      puts "bla"
       @type = config["db_type"]
       if @type == "mysql"
-        #eval %Q(@db = Mysql.new(config["db_server"],config["db_user"],config["db_pass"],config["db_database"]))
-        @db = Mysql.new(config["db_server"],config["db_user"],config["db_pass"],config["db_database"])
+        @db = Mysql.real_connect(config["db_server"],config["db_user"],config["db_pass"],config["db_database"])
         @db.reconnect = true
       elsif @type == "sqlite3"
-        #eval %Q(@db = SQLite3::Database.new(config["db_server"]))
         @db = SQLite3::Database.new(config["db_server"])
+        puts @db.errmsg
       else
         raise ArgumentError.new("Database undefined.")
       end
@@ -167,7 +167,7 @@ module Ink
             result[result.length-1][re.columns[i]] = row[i]
           end
         end
-        re.close
+        re.close if not re.closed?
       end
       result
     end
@@ -177,7 +177,15 @@ module Ink
     # Closes the database connection, there is no way
     # to reopen without creating a new Ink::Database instance
     def close
-      @db.close if @type == "sqlite3" and not @db.closed?
+      if @type == "sqlite3" and not @db.closed?
+        begin
+          @db.close
+        rescue SQLite3::BusyException
+        end
+      elsif @type == "mysql"
+        @db.close
+      end
+      self.class.drop
     end
     
     # Instance method
@@ -265,7 +273,7 @@ module Ink
       union_class = ((class1.downcase <=> class2.downcase) < 0) ? "#{tablename1}_#{tablename2}" : "#{tablename2}_#{tablename1}"
       re = self.query("SELECT #{tablename2}.* FROM #{union_class}, #{tablename2} WHERE #{union_class}.#{fk1} = #{class1_id} AND #{union_class}.#{fk2} = #{tablename2}.#{pk2} #{params};")
       re.each do |entry|
-        instance = Ink::Model.classname(tablename1).new entry
+        instance = Ink::Model.classname(tablename2).new entry
         result.push instance
       end
       result

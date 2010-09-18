@@ -97,7 +97,7 @@ module Ink
       if self.class.respond_to? :fields
         self.class.fields.each do |k,v|
           raise NameError.new("Model cannot use #{k} as field, it already exists") if self.class.respond_to? k or k.to_s.downcase == "pk"
-          raise LoadError.new("Model cannot be loaded, argument missing") if not data[k.to_s] and self.class.primary_key[0] != k
+          raise LoadError.new("Model cannot be loaded, argument missing: #{k}") if not data[k.to_s] and self.class.primary_key[0] != k
           entry = nil
           if data[k.to_s].is_a? String
             entry = data[k.to_s].gsub(/'/, '&#39;')
