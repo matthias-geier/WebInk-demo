@@ -1,4 +1,3 @@
-#!/home/mayutamano/ruby1.8/bin/ruby
 require 'mmap'
 require 'webink/beauty'
 

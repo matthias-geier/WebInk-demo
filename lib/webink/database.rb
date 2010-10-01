@@ -77,14 +77,12 @@ module Ink
     # possible.
     # [param config:] Hash of config parameters
     def initialize(config)
-      puts "bla"
       @type = config["db_type"]
       if @type == "mysql"
         @db = Mysql.real_connect(config["db_server"],config["db_user"],config["db_pass"],config["db_database"])
         @db.reconnect = true
       elsif @type == "sqlite3"
         @db = SQLite3::Database.new(config["db_server"])
-        puts @db.errmsg
       else
         raise ArgumentError.new("Database undefined.")
       end

@@ -150,8 +150,6 @@ module Ink
     # [param args:] Hash of arguments
     # [returns:] interpreted erb instance or nil
     def redirect_to(args)
-      #p = {:get => @params[:get], :config => @params[:config], :time => @params[:time], :root => @params[:root], :cgi => @params[:cgi]}
-      #p[:post] = @params[:post] if @params.has_key? :post
       p = Hash.new
       @params.each do |k,v|
         p[k] = v
@@ -236,7 +234,7 @@ module Ink
     # [param controller:] Controller name string
     # [returns:] class or nil
     def self.verify(controller)
-      ((Module.const_get controller.capitalize).is_a? Class) ? (eval "#{controller.capitalize}") : (raise NameError.new("Controller not found."))
+      ((Module.const_get controller.capitalize).is_a? Class) ? (Module.const_get controller.capitalize) : (raise NameError.new("Controller not found."))
     end
     
     # Instance method

@@ -1,4 +1,3 @@
-#!/home/mayutamano/ruby1.8/bin/ruby
 require "fcgi"
 require "mmap"
 require "webink/beauty"
@@ -27,7 +26,6 @@ FCGI.each_cgi do |cgi|
     if cgi.env_table['REQUEST_METHOD'] == 'POST'
       control[:post] = Hash.new
       cgi.params.each do |k,v|
-        puts v.class
         if v.is_a? Array
           control[:post][k] = Array.new
           v.each do |a|
@@ -38,6 +36,11 @@ FCGI.each_cgi do |cgi|
           control[:post][k] = CGI::escapeHTML(v)
         end
       end
+      pram.each do |k,v|
+        cgi.params[k] = v if not cgi.params.has_key? k
+      end
+    else
+      cgi.params = pram
     end
     control[:get] = pram
     control[:config] = Ink::Beauty.load_config script
