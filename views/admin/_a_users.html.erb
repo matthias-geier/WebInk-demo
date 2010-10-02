@@ -1,0 +1,16 @@
+
+<h3>Administrate Users</h3>
+<% for user in @users %>
+<form method="POST" action="<%= path_to @params[:controller], @params[:module] %>">
+<input type="hidden" name="ref" value="<%= user.pk %>" />
+<h4><%= user.loginname %></h4>
+<input type="password" name="pass" /><label for="pass"> Password</label><br>
+
+<% for role in @roles %>
+<input type="checkbox" name="ref<%= role.pk %>" <%= "checked=checked" if user.can?(role.role) %> /><label for="ref<%= role.pk %>"> <%= role.role %></label><br>
+<% end %>
+
+<input type="submit" name="submit" value="Edit" />
+</form>
+<br><br>
+<% end %>

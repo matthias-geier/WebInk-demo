@@ -1,0 +1,26 @@
+
+<h3><%= @post.title %></h3>
+<div>
+<%= @post.text %>
+</div>
+<p><%= @post.tags %> --- <%= @post.created_at %> by <%= @post.user[0].loginname %></p>
+
+<div>
+<h4>Comments</h4>
+<% for comment in @post.comment %>
+  <p><%= comment.title %> (<%= comment.created_at %>) by <%= comment.user[0].loginname %>:<br>
+  <%= comment.text %></p>
+<% end %>
+
+<h4>Leave comment (register <%= link_to "here", "admin", "register" %>):</h4>
+<form method="POST" action="<%= path_to @params[:controller], @params[:module], @id %>">
+<% if not @u %>
+<input type="text" name="user" value="" /><label for="user"> Username</label><br>
+<input type="password" name="pass" value="" /><label for="pass"> Password</label><br>
+<% end %>
+<input type="text" name="title" value="" /><label for="title"> Title</label><br>
+<textarea name="text" cols="60" rows="20"></textarea><label for="text"> Text</label><br>
+<input type="submit" name="submit" value="Add" />
+</form>
+</div>
+

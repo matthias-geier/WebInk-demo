@@ -1,0 +1,33 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+       "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <meta http-equiv="content-type" content="text/html;charset=UTF-8" />
+  <title><%= @params[:controller].capitalize %>: <%= @params[:module].capitalize %></title>
+</head>
+<body>
+  <% if @message %>
+    <div style="color:red;"><%= @message %></div>
+  <% end %>
+  
+  <div style="float:left; width: 14em;">
+  <% if not @user %>
+    <%= link_to "Login", @params[:controller], "index" %><br>
+    <%= link_to "Register", @params[:controller], "register" %><br>
+  <% else %>
+    <%= link_to "New Post", @params[:controller], "compose" if @user.can?("Post new") %><br>
+    <%= link_to "List Posts", @params[:controller], "list" if @user.can?("Post edit") or @user.can?("Post delete") %><br>
+    <%= link_to "Administrate Posts", @params[:controller], "a_posts" if @user.can?("Post administrate") %><br>
+    <%= link_to "Administrate Comments", @params[:controller], "a_comments" if @user.can?("Comment administrate") %><br>
+    <%= link_to "Administrate Users", @params[:controller], "a_users" if @user.can?("User administrate") %><br>
+    <%= link_to "Administrate Role", @params[:controller], "a_roles" if @user.can?("Role administrate") %><br>
+    <%= link_to "Logout", @params[:controller], "logout" %><br>
+  <% end %>
+  </div>
+  
+  <div style="margin-left: 16em;">
+    <%= locals[0] if locals.length > 0 %>
+  </div>
+</body>
+</html>

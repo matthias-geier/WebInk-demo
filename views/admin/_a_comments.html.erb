@@ -1,0 +1,11 @@
+
+<h3>Administrate Comments</h3>
+<% for comment in @comments %>
+<form method="POST" action="<%= path_to @params[:controller], @params[:module] %>">
+<input type="hidden" name="ref" value="<%= comment.pk %>" />
+<input type="text" name="title" value="<%= comment.title %>" /><label for="title"> Title (<%= comment.created_at %>)</label><br>
+<textarea name="text" cols="60" rows="20"><%= comment.text %></textarea><label for="text"> Text</label><br>
+<input type="submit" name="submit" value="Edit" /><input type="submit" name="submit" value="Delete" />
+</form>
+<br><br>
+<% end %>

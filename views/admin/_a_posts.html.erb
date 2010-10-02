@@ -1,0 +1,14 @@
+
+<h3>Administrate Posts</h3>
+<% for post in @posts %>
+<% if @user.can?("Post administrate") or @user.can?("Post delete") or @user.can?("Post edit") %>
+<form method="POST" action="<%= path_to @params[:controller], @params[:module] %>">
+<input type="hidden" name="ref" value="<%= post.pk %>" />
+<input type="text" name="title" value="<%= post.title %>" /><label for="title"> Title (<%= post.created_at %>)</label><br>
+<input type="text" name="tags" value="<%= post.tags %>" /><label for="tags"> Tags</label><br>
+<textarea name="text" cols="60" rows="20"><%= post.text %></textarea><label for="text"> Text</label><br>
+<% if @user.can?("Post administrate") or @user.can?("Post edit") %><input type="submit" name="submit" value="Edit" /><% end %><% if @user.can?("Post administrate") or @user.can?("Post delete") %><input type="submit" name="submit" value="Delete" /><% end %>
+</form>
+<br><br>
+<% end %>
+<% end %>

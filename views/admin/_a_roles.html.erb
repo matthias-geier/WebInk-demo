@@ -1,0 +1,15 @@
+
+<h3>Administrate Roles</h3>
+<form method="POST" action="<%= path_to @params[:controller], @params[:module] %>">
+<input type="text" name="role" value="" /><label for="role"> Role Name</label><br>
+<input type="submit" name="submit" value="Create" />
+</form>
+<br><br><br><br>
+<% for role in @roles %>
+<form method="POST" action="<%= path_to @params[:controller], @params[:module] %>">
+<input type="hidden" name="ref" value="<%= role.pk %>" />
+<input type="text" name="role" value="<%= role.role %>" /><label for="role"> Role Name</label><br>
+<input type="submit" name="submit" value="Edit" /><input type="submit" name="submit" value="Delete" />
+</form>
+<br><br>
+<% end %>
