@@ -23,17 +23,21 @@ FCGI.each_cgi do |cgi|
     fhandle.munmap
     raise StandardError.new("Routes not matched.") if control.keys.length <= 1
     
+    control[:get] = pram
+    control[:config] = Ink::Beauty.load_config script
+    control[:time] = time
+    control[:cgi] = cgi
     if cgi.env_table['REQUEST_METHOD'] == 'POST'
       control[:post] = Hash.new
       cgi.params.each do |k,v|
         if v.is_a? Array
           control[:post][k] = Array.new
           v.each do |a|
-            control[:post][k].push CGI::escapeHTML(a)
+            control[:post][k].push (control[:config]["escape_post_data"]) ? CGI::escapeHTML(a) : a
           end
           control[:post][k] = control[:post][k].to_s
         else
-          control[:post][k] = CGI::escapeHTML(v)
+          control[:post][k] = (control[:config]["escape_post_data"]) ? CGI::escapeHTML(v) : v
         end
       end
       pram.each do |k,v|
@@ -42,10 +46,6 @@ FCGI.each_cgi do |cgi|
     else
       cgi.params = pram
     end
-    control[:get] = pram
-    control[:config] = Ink::Beauty.load_config script
-    control[:time] = time
-    control[:cgi] = cgi
     
     script = Ink::Beauty.load_init script
     fhandle = Mmap.new(script, "r")

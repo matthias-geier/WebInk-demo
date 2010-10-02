@@ -87,7 +87,7 @@ module Ink
   # == Linking
   #
   # A controller has the ability to create hyperlinks for you, that will dynamically match
-  # the project path etc.
+  # the project path etc. (and is also using the root variable from the routes.rb)
   #
   #   link_to "name", "controller", "module", "param1", "param2", {:class => "h1", :id => "14"}
   #
@@ -98,6 +98,39 @@ module Ink
   # So the first entry of the argument array is the hyperlink name, then all
   # following entries are connected as the href string, prefixed by the root variable
   # that is set in the routes.rb. The hash includes the attributes for the <a>-tag.
+  #
+  # == Pathing
+  #
+  # A controller also constructs paths for you (and is also using the root variable
+  # from the routes.rb), which you can use to dynamically reroute forms, just to
+  # mention one example.
+  #
+  #   @my = "no"
+  #   path_to "this", "is", @my, "path"
+  #
+  # The constructed path will look like this:
+  #
+  #   /this/is/no/path
+  #
+  # It just puts together the arguments given to it.
+  #
+  # == Sessions
+  #
+  # Usually very important in the development of websites are sessions. There is some
+  # basic support for it in webink, that will make certain bits easier. For more information
+  # have a look at the blog-demo.
+  #
+  # Each controller usually expects cookies to work, if you handle sessions via cgi.
+  # Whenever cookies do not work, or you do not intend to use them in the first place,
+  # path_to and link_to watch out for the instance variables @session_key and @session_id
+  # which are added via GET to the path/hyperlink, that they construct. Therefore the
+  # tools should not be used for external linking. The dispatcher automatically filters
+  # the GET session_id when using POST and adds it to the cgi.params, so sessions can
+  # be used confortably.
+  #
+  # Per default, the @session_key should be "_session_id" as specified in the cgi/session
+  # library from ruby core, but the controller offers some freedom, in case you may want
+  # a different key name for some reason.
   #
   # 
   #

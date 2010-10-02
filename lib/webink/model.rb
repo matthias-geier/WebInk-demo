@@ -7,7 +7,7 @@ module Ink
   # Models are usually derived from. So let's assume there is a
   # class called Apple < Ink::Model
   #
-  # apple = Apple.new {:color => "red", :diameter => 4}
+  #   apple = Apple.new {:color => "red", :diameter => 4}
   #
   # The constructor checks, if there are class methods 'fields'
   # and 'foreign' defined. If that check is positive, it will
@@ -16,14 +16,14 @@ module Ink
   # an entry (excluded the primary key). The other case just
   # creates an Apple with the Hash as instance variables.
   #
-  # puts apple.color
+  #   puts apple.color
   #
   # This prints "red" to the stdout, since getter and setter
   # methods are automatically added for either the Hash, or
   # the fields and foreign keys.
   #
-  # apple.tree = nil
-  # apple.save
+  #   apple.tree = nil
+  #   apple.save
   #
   # You can save your apple by using the save method. New instances
   # will create a new row in the database, and update its primary
@@ -31,8 +31,8 @@ module Ink
   # in the sample below a tree, is set to nil by default, and therefore
   # the save method will not touch relationships.
   #
-  # treeinstance.apple = [1,2,myapple]
-  # treeinstance.save
+  #   treeinstance.apple = [1,2,myapple]
+  #   treeinstance.save
   #
   # To insert relationship data, you can provide them by array, value
   # or reference, so setting treeinstance.apple to 1 is allowed, also
@@ -40,7 +40,7 @@ module Ink
   # remove all references. This works both ways, just consider the
   # relationship type, as an apple cannot have more than one tree.
   #
-  # treeinstance.delete
+  #   treeinstance.delete
   #
   # The model provides a convenience method for deletion. It removes all
   # references from relationships, but does not remove the relationships
@@ -50,30 +50,27 @@ module Ink
   #
   # = Fields and foreign sample config
   #
-  # class Apple < Ink::Model
-  # def self.fields
-  # fields = {
-  # :id => "PRIMARY KEY"
-  # :color => [ "VARCHAR", "NOT NULL" ],
-  # :diameter => [ "NUMERIC", "NOT NULL" ]
-  # }
-  # fields
-  # end
-  # def self.foreign
-  # foreign = {
-  # "Tree" => "one_many"
-  # }
-  # foreign
-  # end
-  # end
+  #   class Apple < Ink::Model
+  #     def self.fields
+  #       fields = {
+  #         :id => "PRIMARY KEY"
+  #         :color => [ "VARCHAR", "NOT NULL" ],
+  #         :diameter => [ "NUMERIC", "NOT NULL" ]
+  #       }
+  #       fields
+  #     end
+  #     def self.foreign
+  #       foreign = {
+  #         "Tree" => "one_many"
+  #       }
+  #       foreign
+  #     end
+  #   end
   #
   # Let's look at this construct.
   # The constructor is inherited from Ink::Model, so are its
   # methods. 'fields' defines a Hash of Arrays, that will
-  # create the Database table for us. Be careful with the
-  # primary key, since SQLite autoincrement is not identical
-  # with MySQL autoincrement. Also the primary key has to be
-  # autoincrementing.
+  # create the Database table for us.
   # 'foreign' handles the contraints to other classes, here
   # it reads: one "Tree" has many Apples, other constructs
   # could be: [one "Tree" has one Apple, many "Tree"s have
@@ -113,6 +110,13 @@ module Ink
           end
           if self.class.primary_key[0] != k
             self.class.send(:define_method, "#{k}=") do |val|
+              if val.is_a? String
+                val = val.gsub(/'/, '&#39;')
+              elsif val.is_a? Numeric
+                val = val
+              else
+                val = "\'#{val}\'"
+              end
               instance_variable_set "@#{k}", val
             end
           else
@@ -124,7 +128,7 @@ module Ink
         if self.class.respond_to? :foreign
           self.class.foreign.each do |k,v|
             raise NameError.new("Model cannot use #{k} as foreign, it already exists") if self.class.respond_to? k.to_sym or k.downcase == "pk"
-            eval "@#{self.class.str_to_tablename(k)} = nil"
+            instance_variable_set "@#{self.class.str_to_tablename(k)}", nil
             self.class.send(:define_method, k.downcase) do
               instance_variable_get "@#{k.downcase}"
             end
@@ -135,59 +139,13 @@ module Ink
         end
       else
         data.each do |k,v|
-          eval "@#{k} = #{(v.is_a?(Numeric)) ? v : "\'#{v}\'"}"
+          instance_variable_set "@#{k}", (v.is_a?(Numeric)) ? v : "\'#{v}\'"
         end
       end
     end
     
     # Instance method
     #
-    # Save the instance to the database. Set all foreign sets to
-    # nil if you do not want to change them. Old references are
-    # automatically removed.
-    def save
-      raise NotImplementedError.new("Cannot save to Database without field definitions") if not self.class.respond_to? :fields
-      string = Array.new
-      keystring = Array.new
-      valuestring = Array.new
-      fields = self.class.fields
-      pkvalue = nil
-      for i in 0...fields.keys.length
-        k = fields.keys[i]
-        value = eval "@#{k}"
-        value = "NULL" if not value
-        if k != self.class.primary_key[0]
-          string.push "`#{k}`=#{(value.is_a?(Numeric)) ? value : "\'#{value}\'"}"
-          keystring.push "`#{k}`"
-          valuestring.push "#{(value.is_a?(Numeric)) ? value : "\'#{value}\'"}"
-        else
-          pkvalue = "WHERE `#{self.class.primary_key[0]}`=#{(value.is_a?(Numeric)) ? value : "\'#{value}\'"}"
-        end
-      end
-      if pkvalue
-        response = Ink::Database.database.find self.class.name, pkvalue
-        if response.length == 1
-          Ink::Database.database.query "UPDATE #{Ink::Model.str_to_tablename(self.class.name)} SET #{string * ","} #{pkvalue}"
-        elsif response.length == 0
-          Ink::Database.database.query "INSERT INTO #{Ink::Model.str_to_tablename(self.class.name)} (#{keystring * ","}) VALUES (#{valuestring * ","});"
-          pk = Ink::Database.database.last_inserted_pk
-          eval "@#{self.class.primary_key[0]}=#{pk.is_a?(Numeric) ? pk : "\'#{pk}\'"}" if pk
-        end
-      end
-      
-      if self.class.respond_to? :foreign
-        self.class.foreign.each do |k,v|
-          value = eval "@#{self.class.str_to_tablename(k)}"
-          if value
-            Ink::Database.database.delete_all_links self, Ink::Model.classname(k), v
-            Ink::Database.database.create_all_links self, Ink::Model.classname(k), v, value
-          end
-        end
-      end
-    end
-    
-    # Instance method
-    # 
     # Save the instance to the database. Set all foreign sets to
     # nil if you do not want to change them. Old references are
     # automatically removed.
@@ -217,7 +175,7 @@ module Ink
         elsif response.length == 0
           Ink::Database.database.query "INSERT INTO #{Ink::Model.str_to_tablename(self.class.name)} (#{keystring * ","}) VALUES (#{valuestring * ","});"
           pk = Ink::Database.database.last_inserted_pk
-          instance_variable_set("@#{self.class.primary_key[0]}", pk.is_a?(Numeric) ? pk : "\'#{pk}\'") if pk
+          instance_variable_set "@#{self.class.primary_key[0]}", pk.is_a?(Numeric) ? pk : "\'#{pk}\'" if pk
         end
       end
       

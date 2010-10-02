@@ -4,25 +4,27 @@ module Ink
   # 
   # == Config
   # 
-  # Currently there are 2 types of databases supported, MySQL and
+  # Currently there are two types of databases supported, MySQL and
   # SQLite3. Either way, you need to specify them in a config-file
   # that is located inside the web project folder.
   #
   # Sample config for MySQL:
   #   config = {
-  #     "production"  => true,
-  #     "db_type"     => "mysql",
-  #     "db_user"     => "yourusername",
-  #     "db_pass"     => "yourpassword",
-  #     "db_database" => "yourdatabase",
-  #     "db_server"   => "localhost",
+  #     "escape_post_data"  => false,
+  #     "production"        => true,
+  #     "db_type"           => "mysql",
+  #     "db_user"           => "yourusername",
+  #     "db_pass"           => "yourpassword",
+  #     "db_database"       => "yourdatabase",
+  #     "db_server"         => "localhost",
   #   }
   #
   # Sample config for SQLite3:
   #   config = {
-  #     "production"  => true,
-  #     "db_type"     => "sqlite3",
-  #     "db_server"   => "/full/path/to/database.sqlite",
+  #     "escape_post_data"  => false,
+  #     "production"        => true,
+  #     "db_type"           => "sqlite3",
+  #     "db_server"         => "/full/path/to/database.sqlite",
   #   }
   #
   # == Usage
