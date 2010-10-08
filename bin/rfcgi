@@ -5,12 +5,24 @@ require "webink/beauty"
 def getBinding(cgi,env,params)
   return binding
 end
+def error(cgi, code)
+  puts cgi.header
+  puts cgi.header("nph" => true, "status" => code, "connection" => "close", "type" => "text/html")
+end
 
 script = nil
 fhandle = nil
 control = nil
 pram = nil
+is_production = nil
+use_errors = nil
 FCGI.each_cgi do |cgi|
+  puts cgi.header
+  cgi.env_table.each do |k,v|
+    puts "#{k}=#{v}<br>"
+  end
+  is_production = ((cgi.env_table["INK_PRODUCTION"] and eval cgi.env_table["INK_PRODUCTION"]) or (ENV["INK_PRODUCTION"] and eval ENV["INK_PRODUCTION"])) ? true : false
+  use_errors = ((cgi.env_table["INK_ERRORS"] and eval cgi.env_table["INK_ERRORS"]) or (ENV["INK_ERRORS"] and eval ENV["INK_ERRORS"])) ? true : false
   time = Time.now
   script = cgi.env_table['SCRIPT_FILENAME']
   begin
@@ -33,7 +45,7 @@ FCGI.each_cgi do |cgi|
         if v.is_a? Array
           control[:post][k] = Array.new
           v.each do |a|
-            control[:post][k].push (control[:config]["escape_post_data"]) ? CGI::escapeHTML(a) : a
+            control[:post][k].push((control[:config]["escape_post_data"]) ? CGI::escapeHTML(a) : a)
           end
           control[:post][k] = control[:post][k].to_s
         else
@@ -55,48 +67,54 @@ FCGI.each_cgi do |cgi|
     
     
   rescue LoadError => bang
-    if control and control[:config] and not control[:config]["production"]
-      puts cgi.header({"Location" => "/status-404.html"});
+    if not is_production
+      puts cgi.header({"Location" => "/status-404.html"}) if use_errors
+      error cgi, "NOT_FOUND" if not use_errors
     else
       puts cgi.header
       puts "<hr><b>LoadError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
     end
     
   rescue NotImplementedError => bang
-    if control and control[:config] and not control[:config]["production"]
-      puts cgi.header({"Location" => "/status-500.html"});
+    if not is_production
+      puts cgi.header({"Location" => "/status-500.html"}) if use_errors
+      error cgi, "SERVER_ERROR" if not use_errors
     else
       puts cgi.header
       puts "<hr><b>NotImplementedError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
     end
     
   rescue ArgumentError => bang
-    if control and control[:config] and not control[:config]["production"]
-      puts cgi.header({"Location" => "/status-500.html"});
+    if not is_production
+      puts cgi.header({"Location" => "/status-500.html"}) if use_errors
+      error cgi, "SERVER_ERROR" if not use_errors
     else
       puts cgi.header
       puts "<hr><b>ArgumentError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
     end
     
   rescue RuntimeError => bang
-    if control and control[:config] and not control[:config]["production"]
-      puts cgi.header({"Location" => "/status-500.html"});
+    if not is_production
+      puts cgi.header({"Location" => "/status-500.html"}) if use_errors
+      error cgi, "SERVER_ERROR" if not use_errors
     else
       puts cgi.header
       puts "<hr><b>RuntimeError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
     end
   
   rescue NameError => bang
-    if control and control[:config] and not control[:config]["production"]
-      puts cgi.header({"Location" => "/status-500.html"});
+    if not is_production
+      puts cgi.header({"Location" => "/status-500.html"}) if use_errors
+      error cgi, "SERVER_ERROR" if not use_errors
     else
       puts cgi.header
       puts "<hr><b>NameError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
     end
     
   rescue Exception, StandardError => bang
-    if control and control[:config] and not control[:config]["production"]
-      puts cgi.header({"Location" => "/status-500.html"});
+    if not is_production
+      puts cgi.header({"Location" => "/status-500.html"}) if use_errors
+      error cgi, "SERVER_ERROR" if not use_errors
     else
       puts cgi.header
       puts "<hr><b>Exception:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
