@@ -1,5 +1,5 @@
 require "fcgi"
-require "mmap"
+require "simple_mmap"
 require "webink/beauty"
 
 def getBinding(cgi,env,params)
@@ -17,10 +17,10 @@ pram = nil
 is_production = nil
 use_errors = nil
 FCGI.each_cgi do |cgi|
-  puts cgi.header
-  cgi.env_table.each do |k,v|
-    puts "#{k}=#{v}<br>"
-  end
+  #puts cgi.header
+  #cgi.env_table.each do |k,v|
+  #  puts "#{k}=#{v}<br>"
+  #end
   is_production = ((cgi.env_table["INK_PRODUCTION"] and eval cgi.env_table["INK_PRODUCTION"]) or (ENV["INK_PRODUCTION"] and eval ENV["INK_PRODUCTION"])) ? true : false
   use_errors = ((cgi.env_table["INK_ERRORS"] and eval cgi.env_table["INK_ERRORS"]) or (ENV["INK_ERRORS"] and eval ENV["INK_ERRORS"])) ? true : false
   time = Time.now
@@ -29,10 +29,10 @@ FCGI.each_cgi do |cgi|
     pram = CGI::parse(cgi.env_table['QUERY_STRING'].gsub(/\?/, "&"))
     control = pram['controller'][0]
     routes = Ink::Beauty.load_routes script
-    fhandle = Mmap.new(routes, "r")
+    fhandle = SimpleMmap::MappedFile.new(routes)
     Dir.chdir( File.dirname(routes) )
-    control = eval fhandle, getBinding(cgi,cgi.env_table,control) if fhandle
-    fhandle.munmap
+    control = eval fhandle.read_window_data(0,fhandle.size), getBinding(cgi,cgi.env_table,control) if fhandle
+    fhandle.close
     raise StandardError.new("Routes not matched.") if control.keys.length <= 1
     
     control[:get] = pram
@@ -47,7 +47,7 @@ FCGI.each_cgi do |cgi|
           v.each do |a|
             control[:post][k].push((control[:config]["escape_post_data"]) ? CGI::escapeHTML(a) : a)
           end
-          control[:post][k] = control[:post][k].to_s
+          control[:post][k] = control[:post][k][0] if control[:post][k].length <= 1
         else
           control[:post][k] = (control[:config]["escape_post_data"]) ? CGI::escapeHTML(v) : v
         end
@@ -60,11 +60,10 @@ FCGI.each_cgi do |cgi|
     end
     
     script = Ink::Beauty.load_init script
-    fhandle = Mmap.new(script, "r")
+    fhandle = SimpleMmap::MappedFile.new(script)
     Dir.chdir( File.dirname(script) )
-    eval fhandle, getBinding(cgi,cgi.env_table,control) if fhandle
-    fhandle.munmap
-    
+    eval fhandle.read_window_data(0,fhandle.size), getBinding(cgi,cgi.env_table,control) if fhandle
+    fhandle.close
     
   rescue LoadError => bang
     if not is_production

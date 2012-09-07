@@ -94,9 +94,11 @@ module Ink
       if self.class.respond_to? :fields
         self.class.fields.each do |k,v|
           raise NameError.new("Model cannot use #{k} as field, it already exists") if self.class.respond_to? k or k.to_s.downcase == "pk"
-          raise LoadError.new("Model cannot be loaded, argument missing: #{k}") if not data[k.to_s] and self.class.primary_key[0] != k
+          raise LoadError.new("Model cannot be loaded, argument missing: #{k}") if not data.key?(k.to_s) and self.class.primary_key[0] != k
           entry = nil
-          if data[k.to_s].is_a? String
+          if data[k.to_s].nil?
+            entry = nil
+          elsif data[k.to_s].is_a? String
             entry = data[k.to_s].gsub(/'/, '&#39;')
           elsif data[k.to_s].is_a? Numeric
             entry = data[k.to_s]
@@ -110,7 +112,9 @@ module Ink
           end
           if self.class.primary_key[0] != k
             self.class.send(:define_method, "#{k}=") do |val|
-              if val.is_a? String
+              if data[k.to_s].nil?
+                val = nil
+              elsif val.is_a? String
                 val = val.gsub(/'/, '&#39;')
               elsif val.is_a? Numeric
                 val = val
@@ -139,7 +143,17 @@ module Ink
         end
       else
         data.each do |k,v|
-          instance_variable_set "@#{k}", (v.is_a?(Numeric)) ? v : "\'#{v}\'"
+          entry = nil
+          if v.nil?
+            entry = nil
+          elsif v.is_a? String
+            entry = v.gsub(/'/, '&#39;')
+          elsif v.is_a? Numeric
+            entry = v
+          else
+            entry = "\'#{v}\'"
+          end
+          instance_variable_set "@#{k}", entry
         end
       end
     end
@@ -174,7 +188,7 @@ module Ink
           Ink::Database.database.query "UPDATE #{Ink::Model.str_to_tablename(self.class.name)} SET #{string * ","} #{pkvalue}"
         elsif response.length == 0
           Ink::Database.database.query "INSERT INTO #{Ink::Model.str_to_tablename(self.class.name)} (#{keystring * ","}) VALUES (#{valuestring * ","});"
-          pk = Ink::Database.database.last_inserted_pk
+          pk = Ink::Database.database.last_inserted_pk(self.class.name)
           instance_variable_set "@#{self.class.primary_key[0]}", pk.is_a?(Numeric) ? pk : "\'#{pk}\'" if pk
         end
       end

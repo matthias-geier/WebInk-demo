@@ -192,14 +192,11 @@ module Ink
     # 
     # Attempts to fetch the last inserted primary key
     # [returns:] primary key or nil
-    def last_inserted_pk
-      string = ""
-      if @type == "mysql"
-        string = "LAST_INSERT_ID()"
-      elsif @type == "sqlite3"
-        string = "last_insert_rowid()"
-      end
-      response = self.query "SELECT #{string} as id"
+    def last_inserted_pk(class_name)
+      table_name = Ink::Model.str_to_tablename(class_name)
+      pk_name = Ink::Model.classname(class_name).primary_key[0]
+      return if not (table_name and pk_name)
+      response = self.query("SELECT MAX(#{pk_name}) as id FROM #{table_name};")
       return (response.length > 0) ? response[0]["id"] : nil
     end
     

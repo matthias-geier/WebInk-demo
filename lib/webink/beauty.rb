@@ -33,9 +33,9 @@ module Ink
       config = "#{File.dirname(script)}/config"
       config = "#{config}.rb" if not File.exist? config
       raise LoadError.new("Config not found.") if not File.exist? config
-      fhandle = Mmap.new(config, "r")
-      config = eval fhandle
-      fhandle.munmap
+      fhandle = SimpleMmap::MappedFile.new(config)
+      config = eval fhandle.read_window_data(0,fhandle.size)
+      fhandle.close
       raise RuntimeError.new("Config error.") if not config.instance_of? Hash
       config
     end

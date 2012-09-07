@@ -1,4 +1,4 @@
-require 'mmap'
+require 'simple_mmap'
 require 'webink/beauty'
 
 config = nil

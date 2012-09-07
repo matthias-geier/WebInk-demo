@@ -160,11 +160,13 @@ module Ink
       if args[:template]
         template = File.open "./views/#{args[:template]}.html.erb", "r"
         erb = ERB.new template.readlines * "\n"
+        template.close
         puts @params[:cgi].header
         erb.run self.getBinding(args[:locals])
       elsif args[:partial]
         template = File.open "./views/#{(File.dirname(args[:partial]) != ".") ? "#{File.dirname(args[:partial])}/" : ""}_#{File.basename(args[:partial])}.html.erb", "r"
         erb = ERB.new template.readlines * "\n"
+        template.close
         if not args[:standalone]
           erb.result self.getBinding(args[:locals])
         else
@@ -256,7 +258,7 @@ module Ink
     # Retrieve the current binding of the instance.
     # [param locals:] an Array of data for the template
     # [returns:] current binding
-    def getBinding(*locals)
+    def getBinding(locals)
       binding
     end
     
@@ -267,6 +269,13 @@ module Ink
     # [param controller:] Controller name string
     # [returns:] class or nil
     def self.verify(controller)
+      if not Module.const_defined? controller.capitalize
+        if File.exists? "./controllers/#{controller}.rb"
+          load "./controllers/#{controller}.rb"
+        else
+          raise NameError.new("Controller not found.")
+        end
+      end
       ((Module.const_get controller.capitalize).is_a? Class) ? (Module.const_get controller.capitalize) : (raise NameError.new("Controller not found."))
     end
     
