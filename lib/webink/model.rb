@@ -185,9 +185,9 @@ module Ink
       if pkvalue
         response = Ink::Database.database.find self.class.name, pkvalue
         if response.length == 1
-          Ink::Database.database.query "UPDATE #{Ink::Model.str_to_tablename(self.class.name)} SET #{string * ","} #{pkvalue}"
+          Ink::Database.database.query "UPDATE #{self.class.table_name} SET #{string * ","} #{pkvalue}"
         elsif response.length == 0
-          Ink::Database.database.query "INSERT INTO #{Ink::Model.str_to_tablename(self.class.name)} (#{keystring * ","}) VALUES (#{valuestring * ","});"
+          Ink::Database.database.query "INSERT INTO #{self.class.table_name} (#{keystring * ","}) VALUES (#{valuestring * ","});"
           pk = Ink::Database.database.last_inserted_pk(self.class.name)
           instance_variable_set "@#{self.class.primary_key[0]}", pk.is_a?(Numeric) ? pk : "\'#{pk}\'" if pk
         end
@@ -231,7 +231,7 @@ module Ink
       result = Array.new
       raise NotImplementedError.new("Cannot create a Database without field definitions") if not self.respond_to? :fields
       
-      string = "CREATE TABLE #{Model::str_to_tablename(self.name)} ("
+      string = "CREATE TABLE #{self.table_name} ("
       mfk = self.foreign_key
       fields = self.fields
       for i in 0...fields.keys.length
@@ -246,11 +246,11 @@ module Ink
         for i in 0...foreign.keys.length
           k = foreign.keys[i]
           v = foreign[k]
-          fk = Model::classname(k).foreign_key
+          fk = Ink::Model::classname(k).foreign_key
           string += ",`#{fk[0]}` #{fk[1]}" if fk.length > 0 and (v == "one_many" or (v == "one_one" and (self.name <=> k) < 0))
           
           if mfk.length > 0 and fk.length > 1 and v == "many_many" and (self.name <=> k) < 0
-            result.push "CREATE TABLE #{Model::str_to_tablename(self.name)}_#{Model::str_to_tablename(k)} (#{Ink::Database.database.primary_key_autoincrement*" "}, `#{mfk[0]}` #{mfk[1]}, `#{fk[0]}` #{fk[1]});"
+            result.push "CREATE TABLE #{self.table_name}_#{Ink::Model::str_to_tablename(k)} (#{Ink::Database.database.primary_key_autoincrement*" "}, `#{mfk[0]}` #{mfk[1]}, `#{fk[0]}` #{fk[1]});"
           end
         end
       end
@@ -261,12 +261,32 @@ module Ink
     
     # Class method
     # 
+    # This will retrieve a string-representation of the model name
+    # [returns:] valid classname
+    def self.class_name
+      self.name
+    end
+    
+    # Class method
+    # 
+    # This will retrieve a tablename-representation of the model name
+    # [returns:] valid tablename
+    def self.table_name
+      self.str_to_tablename self.name
+    end
+    
+    # Class method
+    # 
     # This will check the parent module for existing classnames
     # that match the input of the str parameter.
     # [param str:] some string
     # [returns:] valid classname or nil
     def self.str_to_classname(str)
-      ((Module.const_get str.capitalize).is_a? Class) ? str.capitalize : nil
+      res = []
+      str.scan(/((^|_)([a-z0-9]+))/) { |s|
+        res.push(s[2][0].upcase + ((s[2].length > 1) ? s[2][1,s[2].length] : "")) if s.length > 0
+      }
+      ((Module.const_get res.join).is_a? Class) ? res.join : nil
     end
     
     # Class method
@@ -277,7 +297,11 @@ module Ink
     # [param str:] some string
     # [returns:] valid tablename or nil
     def self.str_to_tablename(str)
-      ((Module.const_get str.capitalize).is_a? Class) ? str.downcase : nil
+      res = []
+      str.scan(/([A-Z][a-z0-9]*)/) { |s|
+        res.push (res.length>0) ? "_" + s.join.downcase : s.join.downcase
+      }
+      ((Module.const_get str).is_a? Class) ? res.join : nil
     end
     
     # Class method
@@ -288,7 +312,11 @@ module Ink
     # [param str:] some string
     # [returns:] valid class or nil
     def self.classname(str)
-      ((Module.const_get str.capitalize).is_a? Class) ? (Module.const_get str.capitalize) : nil
+      res = []
+      str.scan(/((^|_)([a-z0-9]+))/) { |s|
+        res.push(s[2][0].upcase + ((s[2].length > 1) ? s[2][1,s[2].length] : "")) if s.length > 0
+      }
+      ((Module.const_get res.join).is_a? Class) ? (Module.const_get res.join) : nil
     end
     
     # Class method
@@ -317,7 +345,7 @@ module Ink
     # [returns:] Array of the form: key name, key type or empty
     def self.foreign_key
       pk = self.primary_key
-      return (pk) ? ["#{self.str_to_tablename(self.name)}_#{pk[0]}", pk[1]] : []
+      return (pk) ? ["#{self.table_name}_#{pk[0]}", pk[1]] : []
     end
     
   end
