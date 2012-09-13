@@ -131,13 +131,14 @@ module Ink
         end
         if self.class.respond_to? :foreign
           self.class.foreign.each do |k,v|
-            raise NameError.new("Model cannot use #{k} as foreign, it already exists") if self.class.respond_to? k.to_sym or k.downcase == "pk"
-            instance_variable_set "@#{self.class.str_to_tablename(k)}", nil
-            self.class.send(:define_method, k.downcase) do
-              instance_variable_get "@#{k.downcase}"
+            k_table = self.class.str_to_tablename(k)
+            raise NameError.new("Model cannot use #{k_table} as foreign, it already exists") if self.class.respond_to? k_table.to_sym or k_table == "pk"
+            instance_variable_set("@#{k_table}", nil)
+            self.class.send(:define_method, k_table) do
+              instance_variable_get "@#{k_table}"
             end
-            self.class.send(:define_method, "#{k.downcase}=") do |val|
-              instance_variable_set "@#{k.downcase}", val
+            self.class.send(:define_method, "#{k_table}=") do |val|
+              instance_variable_set "@#{k_table}", val
             end
           end
         end
@@ -219,6 +220,23 @@ module Ink
       
       pkvalue = instance_variable_get "@#{self.class.primary_key[0]}"
       Ink::Database.database.remove self.class.name, "WHERE `#{self.class.primary_key[0]}`=#{(pkvalue.is_a?(Numeric)) ? pkvalue : "\'#{pkvalue}\'"};"
+    end
+    
+    # Instance method
+    #
+    # Queries the database for foreign keys and attaches them to the
+    # matching foreign accessor
+    # [param foreign_class:] Defines the foreign class name or class
+    def find_references(foreign_class)
+      c = (foreign_class.is_a? Class) ? foreign_class : Ink::Model.classname(foreign_class)
+      relationship = self.foreign[c.table_name]
+      if relationship
+        result_array = (relationship == "many_many") ? Ink::Database.database.find_union(self.class, self.pk, c) : Ink::Database.database.find_references(self.class, self.pk, c)
+        instance_variable_set("@#{c.table_name}", (relationship =~ /_one$/) ? result_array[0] : result_array)
+        true
+      else
+        false
+      end
     end
     
     # Class method
