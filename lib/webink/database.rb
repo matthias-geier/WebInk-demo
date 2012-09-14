@@ -153,7 +153,11 @@ module Ink
           re.each_hash do |row|
             result.push Hash.new
             row.each do |k,v|
-              v = $&.to_i if v =~ /^[0-9]+$/
+              if v =~ /^[0-9]+$/
+                v = $&.to_i
+              elsif v =~ /^[0-9]+\.[0-9]+$/
+                v = $&.to_f
+              end
               result[result.length-1][k] = v
             end
           end
@@ -163,7 +167,11 @@ module Ink
         re.each do |row|
           result.push Hash.new
           for i in 0...re.columns.length
-            row[i] = $&.to_i if row[i] =~ /^[0-9]+$/
+            if row[i] =~ /^[0-9]+$/
+              row[i] = $&.to_i
+            elsif row[i] =~ /^[0-9]+\.[0-9]+$/
+              row[i] = $&.to_f
+            end
             result[result.length-1][re.columns[i]] = row[i]
           end
         end
@@ -191,7 +199,7 @@ module Ink
     # Instance method
     # 
     # Attempts to fetch the last inserted primary key
-    # [param class_name:] Defines the class name or class
+    # [param class_name:] Defines the __table__ name or class
     # [returns:] primary key or nil
     def last_inserted_pk(class_name)
       c = (class_name.is_a? Class) ? class_name : Ink::Model.classname(class_name)
@@ -235,13 +243,14 @@ module Ink
     # [param params:] Additional SQL syntax like WHERE conditions (optional)
     # [returns:] Array of class_name instances from the SQL result set
     def find(class_name, params="")
+      c = (class_name.is_a? Class) ? class_name : Ink::Model.classname(class_name)
       result = Array.new
-      table_name = (class_name.is_a? Class) ? class_name.table_name : Ink::Model.str_to_tablename(class_name)
+      table_name = c.table_name
       return result if not table_name
       
       re = self.query("SELECT * FROM #{table_name} #{params};")
       re.each do |entry|
-        instance = Ink::Model.classname(class_name).new entry
+        instance = c.new entry
         result.push instance
       end
       result
@@ -313,6 +322,24 @@ module Ink
         result.push instance
       end
       result
+    end
+    
+    # Instance method
+    # 
+    # Retrieve one class2 instance, that is related to the class1 instance with
+    # primary key class1_id. Only relevant for one_one and one_many relationships
+    # [param class1:] Reference classname or class
+    # [param class1_id:] Primary key value of the reference classname
+    # [param class2:] Match classname or class
+    # [param params:] Additional SQL syntax like GROUP BY (optional)
+    # [returns:] single class2 instance from the SQL result set
+    def find_reference(class1, class1_id, class2, params="")
+      result_array = self.find_references class1, class1_id, class2, params
+      if result_array.length == 1
+        result_array[0]
+      else
+        nil
+      end
     end
     
     # Instance method

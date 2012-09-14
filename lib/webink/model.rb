@@ -184,12 +184,12 @@ module Ink
         end
       end
       if pkvalue
-        response = Ink::Database.database.find self.class.name, pkvalue
+        response = Ink::Database.database.find self.class, pkvalue
         if response.length == 1
           Ink::Database.database.query "UPDATE #{self.class.table_name} SET #{string * ","} #{pkvalue}"
         elsif response.length == 0
           Ink::Database.database.query "INSERT INTO #{self.class.table_name} (#{keystring * ","}) VALUES (#{valuestring * ","});"
-          pk = Ink::Database.database.last_inserted_pk(self.class.name)
+          pk = Ink::Database.database.last_inserted_pk(self.class)
           instance_variable_set "@#{self.class.primary_key[0]}", pk.is_a?(Numeric) ? pk : "\'#{pk}\'" if pk
         end
       end
@@ -229,7 +229,7 @@ module Ink
     # [param foreign_class:] Defines the foreign class name or class
     def find_references(foreign_class)
       c = (foreign_class.is_a? Class) ? foreign_class : Ink::Model.classname(foreign_class)
-      relationship = self.foreign[c.table_name]
+      relationship = self.class.foreign[c.class_name]
       if relationship
         result_array = (relationship == "many_many") ? Ink::Database.database.find_union(self.class, self.pk, c) : Ink::Database.database.find_references(self.class, self.pk, c)
         instance_variable_set("@#{c.table_name}", (relationship =~ /_one$/) ? result_array[0] : result_array)
@@ -331,9 +331,13 @@ module Ink
     # [returns:] valid class or nil
     def self.classname(str)
       res = []
-      str.scan(/((^|_)([a-z0-9]+))/) { |s|
-        res.push(s[2][0].upcase + ((s[2].length > 1) ? s[2][1,s[2].length] : "")) if s.length > 0
-      }
+      if str[0] =~ /^[a-z]/
+        str.scan(/((^|_)([a-z0-9]+))/) { |s|
+          res.push(s[2][0].upcase + ((s[2].length > 1) ? s[2][1,s[2].length] : "")) if s.length > 0
+        }
+      else
+        res.push str
+      end
       ((Module.const_get res.join).is_a? Class) ? (Module.const_get res.join) : nil
     end
     
