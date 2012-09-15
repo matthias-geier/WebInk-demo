@@ -36,7 +36,7 @@ FCGI.each_cgi do |cgi|
         pram[k] = v
       end
     end
-    control = pram['controller'][0]
+    control = pram['controller']
     routes = Ink::Beauty.load_routes script
     fhandle = SimpleMmap::MappedFile.new(routes)
     Dir.chdir( File.dirname(routes) )
