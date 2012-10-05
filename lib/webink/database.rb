@@ -332,7 +332,7 @@ module Ink
     # [param class1_id:] Primary key value of the reference classname
     # [param class2:] Match classname or class
     # [param params:] Additional SQL syntax like GROUP BY (optional)
-    # [returns:] single class2 instance from the SQL result set
+    # [returns:] single class2 instance from the SQL result set or nil
     def find_reference(class1, class1_id, class2, params="")
       result_array = self.find_references class1, class1_id, class2, params
       if result_array.length == 1
