@@ -232,7 +232,7 @@ module Ink
       relationship = self.class.foreign[c.class_name]
       if relationship
         result_array = (relationship == "many_many") ? Ink::Database.database.find_union(self.class, self.pk, c) : Ink::Database.database.find_references(self.class, self.pk, c)
-        instance_variable_set("@#{c.table_name}", (relationship =~ /_one$/) ? result_array[0] : result_array)
+        instance_variable_set("@#{c.table_name}", (relationship =~ /^one_/) ? result_array[0] : result_array)
         true
       else
         false
