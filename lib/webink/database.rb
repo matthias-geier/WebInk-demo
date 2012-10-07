@@ -39,14 +39,20 @@ module Ink
   # This is the most basic query, it returns an Array of results,
   # and each element contains a Hash of column_name => column_entry.
   #
-  #   Ink::Database.database.find "apples", "WHERE id < 10 GROUP BY color"
-  #   => self.query("SELECT * FROM apples WHERE id < 10 GROUP BY color;")
+  # The following methods are convenience methods to access data for
+  # models. As example a model Apple and its n:1 relation to Tree
+  # are used. Please note that both class and database table name can
+  # be used to call the find and related methods. The table name for
+  # Apple would be "apple"; for MyApple would be "my_apple".
+  #
+  #   Ink::Database.database.find "apple", "WHERE id < 10 GROUP BY color"
+  #   => self.query("SELECT * FROM apple WHERE id < 10 GROUP BY color;")
   #
   # This is different from the query method, because it returns an Array
   # of Objects, created by the information stored in the database. So this
   # find() will return you a set of Apple-instances.
   #
-  #   Ink::Database.database.find_union "apple", 5, "tree", ""
+  #   Ink::Database.database.find_union "apple", 5, "tree", "AND tree_id>1"
   #
   # find_union allows you to retrieve data through a many_many reference.
   # When you define a many_many relationship, a helper-table is created
@@ -56,15 +62,29 @@ module Ink
   # by the alphabetically first, and then second classname. The last quotes
   # allow additional query informations to be passed along (like group by)
   #
-  #   Ink::Database.database.find_reference "tree", 1, "apple", ""
+  #   Ink::Database.database.find_references Tree, 1, Apple, "AND tree_id>1"
   #
-  # find_reference is similar to find_union, only that it handles all
+  # find_references is similar to find_union, only that it handles all
   # other relationships. This statement above requires one Tree to have many
   # Apples, so it will return an Array of Apples, all those that belong to
   # the Tree with primary key 1
   #
+  #   Ink::Database.database.find_reference Apple, 5, Tree, ""
+  #
+  # find_reference is essentially equal to find_references, yet it returns
+  # one result of a Tree or nil. This is used when Apple-Tree is a many_one
+  # or one_one relationship. It saves the need for the result Array from
+  # find_references.
+  #
   # Please close the dbinstance once you are done. This is automatically
   # inserted in the init.rb of a project.
+  #
+  # == Convenience methods
+  #
+  #   Database.format_date(Time.now)
+  #
+  # This will return a date in the form of 2012-11-20 10:00:02 and takes a Time
+  # instance.
   #
   # 
   #

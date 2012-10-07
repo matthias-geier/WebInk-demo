@@ -22,14 +22,12 @@ module Ink
   # methods are automatically added for either the Hash, or
   # the fields and foreign keys.
   #
-  #   apple.tree = nil
   #   apple.save
   #
   # You can save your apple by using the save method. New instances
   # will create a new row in the database, and update its primary
-  # key. Old instances just update the fields. Relationships, like
-  # in the sample below a tree, is set to nil by default, and therefore
-  # the save method will not touch relationships.
+  # key. Old instances just update the fields. Relationships are set
+  # to nil by default and will not be touched while nil.
   #
   #   treeinstance.apple = [1,2,myapple]
   #   treeinstance.save
@@ -46,6 +44,13 @@ module Ink
   # references from relationships, but does not remove the relationships
   # themselves, so you must fetch all related data, and delete them by
   # 'hand' if you will.
+  #
+  #   treeinstance.find_references Apple
+  #
+  # This convenience method finds all apples for this tree and makes
+  # them available in the accessor. If the Tree-Apple relationship is
+  # a *_one, then there is only one object in the accessor, otherwise
+  # an Array of objects.
   #
   #
   # = Fields and foreign sample config
@@ -78,6 +83,33 @@ module Ink
   # many_many, many_one]
   # Obviously the Tree class requires a foreign with "Apple"
   # mapped to "many_one" to match this schema.
+  #
+  # == Convenience methods
+  #
+  #   self.primary_key
+  #   self.foreign_key
+  #
+  # Both return an Array of length 2, where the second entry
+  # is the type and the first for primary_key is the name of
+  # the primary key (default "id"). The foreign_key has a
+  # combination of "classname"_"primary_key" (i.e. "apple_id")
+  #
+  #   self.class_name
+  #
+  # Equivalent to class.name
+  #
+  #   self.table_name
+  #
+  # Generates a table representation of the class. (Apple as
+  # "apple" and MyApple as "my_apple")
+  #
+  #   self.str_to_classname(str)
+  #
+  # Converts a table name to class name. This method takes a string.
+  #
+  #   self.str_to_tablename(str)
+  #
+  # Converts a class name to table name. This method takes a string.
   #
   #
   #

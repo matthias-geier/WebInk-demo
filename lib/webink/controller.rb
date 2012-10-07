@@ -6,12 +6,13 @@ module Ink
   # 
   # Controllers handle incoming requests and decide what to do
   # with them. A controller has access to all incoming data, like
-  # POST and GET as well as the config.
+  # POST and GET (through @params[:get] and @params[:post] as
+  # well as the config.
   #
   #   class App < Ink::Controller
   #     
   #     def index
-  #       redirect_to :controller => "app", :module => "feed", :id => 29382374
+  #       redirect_to :controller => "my_app", :module => "feed", :id => 29382374
   #     end
   #     
   #     def feed
@@ -27,9 +28,11 @@ module Ink
   #     
   #   end
   #
-  # A controller named App should have the filename app.rb and be
-  # placed inside the project controller folder. It can have instance
-  # methods that are usually refered to as modules.
+  # A controller named App should have the filename app.rb (note
+  # that underscores are not allowed: "app".capitalize must be
+  # the loadable classname) and be placed inside the project
+  # controller folder. It can have instance methods that are
+  # usually refered to as modules.
   # So a route should contain at least a :controller and a :module.
   #
   # In the sample above there are three modules, index redirects
@@ -211,8 +214,7 @@ module Ink
     # [returns:] Hyperlink
     def link_to(*args)
       raise ArgumentError.new("Expects an array.") if not args.instance_of? Array and args.length < 2
-      href = "#{@params[:root]}#{(@params[:root][@params[:root].length-1].chr == "/") ? "" : "/"}" if @params[:root].length > 0
-      href = "/" if @params[:root].length == 0
+      href = (@params[:root].length == 0) ? "/" : "#{@params[:root]}#{(@params[:root][@params[:root].length-1].chr == "/") ? "" : "/"}"
       a = "<a "
       name = args[0]
       for i in 1...args.length
@@ -238,8 +240,7 @@ module Ink
     # [param args:] Array of Strings or String
     # [returns:] path
     def path_to(*args)
-      href = "#{@params[:root]}#{(@params[:root][@params[:root].length-1].chr == "/") ? "" : "/"}" if @params[:root].length > 0
-      href = "/" if @params[:root].length == 0
+      href = (@params[:root].length == 0) ? "/" : "#{@params[:root]}#{(@params[:root][@params[:root].length-1].chr == "/") ? "" : "/"}"
       
       if args.is_a? Array
         for i in 0...args.length
