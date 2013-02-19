@@ -48,6 +48,9 @@ FCGI.each_cgi do |cgi|
     control[:config] = Ink::Beauty.load_config script
     control[:time] = time
     control[:cgi] = cgi
+    control[:env] = ENV
+    control[:is_production] = is_production
+    control[:use_errors] = use_errors
     if cgi.env_table['REQUEST_METHOD'] == 'POST'
       control[:post] = Hash.new
       cgi.params.each do |k,v|
@@ -75,7 +78,7 @@ FCGI.each_cgi do |cgi|
     fhandle.close
     
   rescue LoadError => bang
-    if not is_production
+    if is_production
       puts cgi.header({"Location" => "/status-404.html"}) if use_errors
       error cgi, "NOT_FOUND" if not use_errors
     else
@@ -84,7 +87,7 @@ FCGI.each_cgi do |cgi|
     end
     
   rescue NotImplementedError => bang
-    if not is_production
+    if is_production
       puts cgi.header({"Location" => "/status-500.html"}) if use_errors
       error cgi, "SERVER_ERROR" if not use_errors
     else
@@ -93,7 +96,7 @@ FCGI.each_cgi do |cgi|
     end
     
   rescue ArgumentError => bang
-    if not is_production
+    if is_production
       puts cgi.header({"Location" => "/status-500.html"}) if use_errors
       error cgi, "SERVER_ERROR" if not use_errors
     else
@@ -102,7 +105,7 @@ FCGI.each_cgi do |cgi|
     end
     
   rescue RuntimeError => bang
-    if not is_production
+    if is_production
       puts cgi.header({"Location" => "/status-500.html"}) if use_errors
       error cgi, "SERVER_ERROR" if not use_errors
     else
@@ -111,7 +114,7 @@ FCGI.each_cgi do |cgi|
     end
   
   rescue NameError => bang
-    if not is_production
+    if is_production
       puts cgi.header({"Location" => "/status-500.html"}) if use_errors
       error cgi, "SERVER_ERROR" if not use_errors
     else
@@ -120,7 +123,7 @@ FCGI.each_cgi do |cgi|
     end
     
   rescue Exception, StandardError => bang
-    if not is_production
+    if is_production
       puts cgi.header({"Location" => "/status-500.html"}) if use_errors
       error cgi, "SERVER_ERROR" if not use_errors
     else

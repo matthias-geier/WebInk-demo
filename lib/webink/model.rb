@@ -12,7 +12,7 @@ module Ink
   # The constructor checks, if there are class methods 'fields'
   # and 'foreign' defined. If that check is positive, it will
   # match the parameter Hash to the fields, that are set for
-  # the database, and thow an exception if fields is lacking
+  # the database, and throw an exception if fields is lacking
   # an entry (excluded the primary key). The other case just
   # creates an Apple with the Hash as instance variables.
   #
@@ -83,6 +83,10 @@ module Ink
   # many_many, many_one]
   # Obviously the Tree class requires a foreign with "Apple"
   # mapped to "many_one" to match this schema.
+  # 
+  # You can override the automatically generated getters and
+  # setters in any Model class you create by just redefining
+  # the methods.
   #
   # == Convenience methods
   #
@@ -125,7 +129,7 @@ module Ink
     def initialize(data)
       if self.class.respond_to? :fields
         self.class.fields.each do |k,v|
-          raise NameError.new("Model cannot use #{k} as field, it already exists") if self.class.respond_to? k or k.to_s.downcase == "pk"
+          raise NameError.new("Model cannot use #{k} as field, it is blocked by primary key") if k.to_s.downcase == "pk"
           raise LoadError.new("Model cannot be loaded, argument missing: #{k}") if not data.key?(k.to_s) and self.class.primary_key[0] != k
           entry = nil
           if data[k.to_s].nil?
@@ -139,21 +143,25 @@ module Ink
           end
           instance_variable_set("@#{k}", entry)
           
-          self.class.send(:define_method, k) do
-            instance_variable_get "@#{k}"
+          if not self.respond_to? k
+            self.class.send(:define_method, k) do
+              instance_variable_get "@#{k}"
+            end
           end
           if self.class.primary_key[0] != k
-            self.class.send(:define_method, "#{k}=") do |val|
-              if data[k.to_s].nil?
-                val = nil
-              elsif val.is_a? String
-                val = val.gsub(/'/, '&#39;')
-              elsif val.is_a? Numeric
-                val = val
-              else
-                val = "\'#{val}\'"
+            if not self.respond_to? "#{k}="
+              self.class.send(:define_method, "#{k}=") do |val|
+                if data[k.to_s].nil?
+                  val = nil
+                elsif val.is_a? String
+                  val = val.gsub(/'/, '&#39;')
+                elsif val.is_a? Numeric
+                  val = val
+                else
+                  val = "\'#{val}\'"
+                end
+                instance_variable_set "@#{k}", val
               end
-              instance_variable_set "@#{k}", val
             end
           else
             self.class.send(:define_method, "pk") do
@@ -164,13 +172,15 @@ module Ink
         if self.class.respond_to? :foreign
           self.class.foreign.each do |k,v|
             k_table = self.class.str_to_tablename(k)
-            raise NameError.new("Model cannot use #{k_table} as foreign, it already exists") if self.class.respond_to? k_table.to_sym or k_table == "pk"
-            instance_variable_set("@#{k_table}", nil)
-            self.class.send(:define_method, k_table) do
-              instance_variable_get "@#{k_table}"
-            end
-            self.class.send(:define_method, "#{k_table}=") do |val|
-              instance_variable_set "@#{k_table}", val
+            raise NameError.new("Model cannot use #{k_table} as foreign, it already exists") if k_table == "pk"
+            if not self.respond_to? k_table
+              instance_variable_set("@#{k_table}", nil)
+              self.class.send(:define_method, k_table) do
+                instance_variable_get "@#{k_table}"
+              end
+              self.class.send(:define_method, "#{k_table}=") do |val|
+                instance_variable_set "@#{k_table}", val
+              end
             end
           end
         end
@@ -218,7 +228,7 @@ module Ink
       if pkvalue
         response = Ink::Database.database.find self.class, pkvalue
         if response.length == 1
-          Ink::Database.database.query "UPDATE #{self.class.table_name} SET #{string * ","} #{pkvalue}"
+          Ink::Database.database.query "UPDATE #{self.class.table_name} SET #{string * ","} #{pkvalue};"
         elsif response.length == 0
           Ink::Database.database.query "INSERT INTO #{self.class.table_name} (#{keystring * ","}) VALUES (#{valuestring * ","});"
           pk = Ink::Database.database.last_inserted_pk(self.class)
@@ -251,7 +261,7 @@ module Ink
       end
       
       pkvalue = instance_variable_get "@#{self.class.primary_key[0]}"
-      Ink::Database.database.remove self.class.name, "WHERE `#{self.class.primary_key[0]}`=#{(pkvalue.is_a?(Numeric)) ? pkvalue : "\'#{pkvalue}\'"};"
+      Ink::Database.database.remove self.class.name, "WHERE `#{self.class.primary_key[0]}`=#{(pkvalue.is_a?(Numeric)) ? pkvalue : "\'#{pkvalue}\'"}"
     end
     
     # Instance method
