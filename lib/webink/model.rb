@@ -8,6 +8,7 @@ module Ink
   # class called Apple < Ink::Model
   #
   #   apple = Apple.new {:color => "red", :diameter => 4}
+  #   apple = Apple.new [ "red", 4 ]
   #
   # The constructor checks, if there are class methods 'fields'
   # and 'foreign' defined. If that check is positive, it will
@@ -15,6 +16,9 @@ module Ink
   # the database, and throw an exception if fields is lacking
   # an entry (excluded the primary key). The other case just
   # creates an Apple with the Hash as instance variables.
+  # An alternate method of creating a new apple is by providing
+  # an Array of values in the same order as in the fields
+  # definition.
   #
   #   puts apple.color
   #
@@ -83,7 +87,7 @@ module Ink
   # many_many, many_one]
   # Obviously the Tree class requires a foreign with "Apple"
   # mapped to "many_one" to match this schema.
-  # 
+  #
   # You can override the automatically generated getters and
   # setters in any Model class you create by just redefining
   # the methods.
@@ -91,12 +95,13 @@ module Ink
   # == Convenience methods
   #
   #   self.primary_key
+  #   self.primary_key_type
   #   self.foreign_key
+  #   self.foreign_key_type
   #
-  # Both return an Array of length 2, where the second entry
-  # is the type and the first for primary_key is the name of
-  # the primary key (default "id"). The foreign_key has a
-  # combination of "classname"_"primary_key" (i.e. "apple_id")
+  # primary_key is the name of the primary key (default "id").
+  # The foreign_key has a combination of "classname"_"primary_key"
+  # (i.e. "apple_id")
   #
   #   self.class_name
   #
@@ -118,89 +123,131 @@ module Ink
   #
   #
   class Model
-    
+
     # Constructor
     #
     # Keys from the data parameter will be converted into
     # instance variables with getters and setters in place.
+    # The data parameter can be an Array of length of the
+    # defined fields or without the primary key. The order
+    # needs to be the same as the defined fields.
     # The primary key has no setter, but adds a getter called
     # pk for convenience.
-    # [param data:] Hash of String => Objects
+    # [param data:] Hash of String => Objects or Array of Objects
     def initialize(data)
       if self.class.respond_to? :fields
+        i = 0
         self.class.fields.each do |k,v|
-          raise NameError.new("Model cannot use #{k} as field, it is blocked by primary key") if k.to_s.downcase == "pk"
-          raise LoadError.new("Model cannot be loaded, argument missing: #{k}") if not data.key?(k.to_s) and self.class.primary_key[0] != k
-          entry = nil
-          if data[k.to_s].nil?
-            entry = nil
-          elsif data[k.to_s].is_a? String
-            entry = data[k.to_s].gsub(/'/, '&#39;')
-          elsif data[k.to_s].is_a? Numeric
-            entry = data[k.to_s]
+          if data.is_a? Array
+            raise LoadError.new("Model cannot be loaded, wrong number or arguments #{data.length} expected #{self.class.fields.length} or #{self.class.fields.length - 1}") if data.length < self.class.fields.length - 1 or data.length > self.class.fields.length
+            init_field k, data[i] if self.class.primary_key != k or data.length == self.class.fields.length
+            i += 1
           else
-            entry = "\'#{data[k.to_s]}\'"
-          end
-          instance_variable_set("@#{k}", entry)
-          
-          if not self.respond_to? k
-            self.class.send(:define_method, k) do
-              instance_variable_get "@#{k}"
-            end
-          end
-          if self.class.primary_key[0] != k
-            if not self.respond_to? "#{k}="
-              self.class.send(:define_method, "#{k}=") do |val|
-                if data[k.to_s].nil?
-                  val = nil
-                elsif val.is_a? String
-                  val = val.gsub(/'/, '&#39;')
-                elsif val.is_a? Numeric
-                  val = val
-                else
-                  val = "\'#{val}\'"
-                end
-                instance_variable_set "@#{k}", val
-              end
-            end
-          else
-            self.class.send(:define_method, "pk") do
-              instance_variable_get "@#{k.to_s.downcase}"
-            end
+            raise LoadError.new("Model cannot be loaded, argument missing: #{key}") if not data.key?(k.to_s) and self.class.primary_key != k
+            init_field k, data[k.to_s]
           end
         end
         if self.class.respond_to? :foreign
           self.class.foreign.each do |k,v|
-            k_table = self.class.str_to_tablename(k)
-            raise NameError.new("Model cannot use #{k_table} as foreign, it already exists") if k_table == "pk"
-            if not self.respond_to? k_table
-              instance_variable_set("@#{k_table}", nil)
-              self.class.send(:define_method, k_table) do
-                instance_variable_get "@#{k_table}"
-              end
-              self.class.send(:define_method, "#{k_table}=") do |val|
-                instance_variable_set "@#{k_table}", val
-              end
-            end
+            init_foreign k
           end
         end
       else
         data.each do |k,v|
-          entry = nil
-          if v.nil?
-            entry = nil
-          elsif v.is_a? String
-            entry = v.gsub(/'/, '&#39;')
-          elsif v.is_a? Numeric
-            entry = v
-          else
-            entry = "\'#{v}\'"
-          end
-          instance_variable_set "@#{k}", entry
+          init_no_fields k, v
         end
       end
     end
-    
+
+    # Private instance method
+    #
+    # Provides an instance accessor and setter for the key. It is
+    # initialized with data[key].
+    # [key:] String
+    # [data:] Hash of String => Object
+    def init_field(key, value)
+      raise NameError.new("Model cannot use #{key} as field, it is blocked by primary key") if key.to_s.downcase == "pk"
+      entry = nil
+      if value.nil?
+        entry = nil
+      elsif value.is_a? String
+        entry = value.gsub(/'/, '&#39;')
+      elsif value.is_a? Numeric
+        entry = value
+      else
+        entry = "\'#{value}\'"
+      end
+      instance_variable_set("@#{key}", entry)
+
+      if not self.respond_to? key
+        self.class.send(:define_method, key) do
+          instance_variable_get "@#{key}"
+        end
+      end
+      if self.class.primary_key != key
+        if not self.respond_to? "#{key}="
+          self.class.send(:define_method, "#{key}=") do |val|
+            if val.nil?
+              val = nil
+            elsif val.is_a? String
+              val = val.gsub(/'/, '&#39;')
+            elsif val.is_a? Numeric
+              val = val
+            else
+              val = "\'#{val}\'"
+            end
+            instance_variable_set "@#{key}", val
+          end
+        end
+      else
+        self.class.send(:define_method, "pk") do
+          instance_variable_get "@#{key.to_s.downcase}"
+        end
+      end
+    end
+    private :init_field
+
+    # Private instance method
+    #
+    # Evaluates the value type and provides an instance accessor
+    # to access the value by key.
+    # [key:] String
+    # [value:] Object
+    def init_no_fields(key, value)
+      entry = nil
+      if value.nil?
+        entry = nil
+      elsif value.is_a? String
+        entry = value.gsub(/'/, '&#39;')
+      elsif value.is_a? Numeric
+        entry = value
+      else
+        entry = "\'#{value}\'"
+      end
+      instance_variable_set "@#{key}", entry
+    end
+    private :init_no_fields
+
+    # Private instance method
+    #
+    # Transforms the key to tablename and provides an instance accessor
+    # and setter for the key. It is initialized with nil.
+    # [key:] String
+    def init_foreign(key)
+      k_table = self.class.str_to_tablename(key)
+      raise NameError.new("Model cannot use #{k_table} as foreign, it already exists") if k_table == "pk"
+      if not self.respond_to?(k_table)
+        instance_variable_set("@#{k_table}", nil)
+        self.class.send(:define_method, k_table) do
+          instance_variable_get "@#{k_table}"
+        end
+        self.class.send(:define_method, "#{k_table}=") do |val|
+          instance_variable_set "@#{k_table}", val
+        end
+      end
+    end
+    private :init_foreign
+
     # Instance method
     #
     # Save the instance to the database. Set all foreign sets to
@@ -235,7 +282,7 @@ module Ink
           instance_variable_set "@#{self.class.primary_key[0]}", pk.is_a?(Numeric) ? pk : "\'#{pk}\'" if pk
         end
       end
-      
+
       if self.class.respond_to? :foreign
         self.class.foreign.each do |k,v|
           value = instance_variable_get "@#{self.class.str_to_tablename(k)}"
@@ -246,9 +293,9 @@ module Ink
         end
       end
     end
-    
+
     # Instance method
-    # 
+    #
     # Deletes the data from the database, essentially making the instance
     # obsolete. Disregard from using the instance anymore.
     # All links between models will be removed also.
@@ -259,11 +306,11 @@ module Ink
           Ink::Database.database.delete_all_links self, Ink::Model.classname(k), v
         end
       end
-      
+
       pkvalue = instance_variable_get "@#{self.class.primary_key[0]}"
       Ink::Database.database.remove self.class.name, "WHERE `#{self.class.primary_key[0]}`=#{(pkvalue.is_a?(Numeric)) ? pkvalue : "\'#{pkvalue}\'"}"
     end
-    
+
     # Instance method
     #
     # Queries the database for foreign keys and attaches them to the
@@ -280,9 +327,9 @@ module Ink
         false
       end
     end
-    
+
     # Class method
-    # 
+    #
     # This will create SQL statements for creating the
     # database tables. 'fields' method is mandatory for
     # this, and 'foreign' is optional.
@@ -290,7 +337,7 @@ module Ink
     def self.create
       result = Array.new
       raise NotImplementedError.new("Cannot create a Database without field definitions") if not self.respond_to? :fields
-      
+
       string = "CREATE TABLE #{self.table_name} ("
       mfk = self.foreign_key
       fields = self.fields
@@ -300,7 +347,7 @@ module Ink
         string += "#{Ink::Database.database.primary_key_autoincrement(k)*" "}" if k == self.primary_key[0]
         string += "," if i < fields.keys.length - 1
       end
-      
+
       if self.respond_to? :foreign
         foreign = self.foreign
         for i in 0...foreign.keys.length
@@ -308,7 +355,7 @@ module Ink
           v = foreign[k]
           fk = Ink::Model::classname(k).foreign_key
           string += ",`#{fk[0]}` #{fk[1]}" if fk.length > 0 and (v == "one_many" or (v == "one_one" and (self.name <=> k) < 0))
-          
+
           if mfk.length > 0 and fk.length > 1 and v == "many_many" and (self.name <=> k) < 0
             result.push "CREATE TABLE #{self.table_name}_#{Ink::Model::str_to_tablename(k)} (#{Ink::Database.database.primary_key_autoincrement*" "}, `#{mfk[0]}` #{mfk[1]}, `#{fk[0]}` #{fk[1]});"
           end
@@ -318,25 +365,25 @@ module Ink
       result.push string
       result
     end
-    
+
     # Class method
-    # 
+    #
     # This will retrieve a string-representation of the model name
     # [returns:] valid classname
     def self.class_name
       self.name
     end
-    
+
     # Class method
-    # 
+    #
     # This will retrieve a tablename-representation of the model name
     # [returns:] valid tablename
     def self.table_name
       self.str_to_tablename self.name
     end
-    
+
     # Class method
-    # 
+    #
     # This will check the parent module for existing classnames
     # that match the input of the str parameter.
     # [param str:] some string
@@ -348,9 +395,9 @@ module Ink
       }
       ((Module.const_get res.join).is_a? Class) ? res.join : nil
     end
-    
+
     # Class method
-    # 
+    #
     # This will check the parent module for existing classnames
     # that match the input of the str parameter. Once found, it
     # converts the string into the matching tablename.
@@ -363,9 +410,9 @@ module Ink
       }
       ((Module.const_get str).is_a? Class) ? res.join : nil
     end
-    
+
     # Class method
-    # 
+    #
     # This will check the parent module for existing classnames
     # that match the input of the str parameter. Once found, it
     # returns the class, not the string of the class.
@@ -382,36 +429,52 @@ module Ink
       end
       ((Module.const_get res.join).is_a? Class) ? (Module.const_get res.join) : nil
     end
-    
+
     # Class method
     #
     # This will find the primary key, as defined in the fields class
     # method.
-    # [returns:] Array of the form: key name, key type or empty
+    # [returns:] key name or nil
     def self.primary_key
       if self.respond_to? :fields
-        pk = nil
-        pktype = nil
-        self.fields.each do |k,v|
-          if v.is_a?(String) and v == "PRIMARY KEY"
-            pk = k
-            pktype = Ink::Database.database.primary_key_autoincrement(k)[1]
-          end
-        end
-        return [pk, pktype]
+        field = self.fields.select{|k,v| v.is_a?(String) and v == "PRIMARY KEY"}
+        return field.keys.first
       end
-      return []
+      nil
     end
-    
+
+    # Class method
+    #
+    # This will find the primary key type, as defined in the fields
+    # class method.
+    # [returns:] key type or nil
+    def self.primary_key_type
+      if self.respond_to? :fields
+        field = self.fields.select{|k,v| v.is_a?(String) and v == "PRIMARY KEY"}
+        return Ink::Database.database.
+          primary_key_autoincrement(field.keys.first)[1]
+      end
+      nil
+    end
+
     # Class method
     #
     # This will create the foreign key from the defined primary key
-    # [returns:] Array of the form: key name, key type or empty
+    # [returns:] key name or nil
     def self.foreign_key
       pk = self.primary_key
-      return (pk) ? ["#{self.table_name}_#{pk[0]}", pk[1]] : []
+      return (pk) ? "#{self.table_name}_#{pk}" : nil
     end
-    
+
+    # Class method
+    #
+    # This will find the foreign key type, taken from the primary key
+    # in fields.
+    # [returns:] key type or nil
+    def self.foreign_key_type
+      self.primary_key_type
+    end
+
   end
-  
+
 end

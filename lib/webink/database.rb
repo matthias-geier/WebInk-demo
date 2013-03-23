@@ -1,9 +1,9 @@
 module Ink
 
   # = Database class
-  # 
+  #
   # == Config
-  # 
+  #
   # Currently there are two types of databases supported, MySQL and
   # SQLite3. Either way, you need to specify them in a config-file
   # that is located inside the web project folder.
@@ -38,6 +38,16 @@ module Ink
   #
   # This is the most basic query, it returns an Array of results,
   # and each element contains a Hash of column_name => column_entry.
+  #
+  #   Ink::Database.database.query("SELECT * FROM x;", Array){ |itm, k, v|
+  #     itm.push v
+  #   }
+  #
+  # The query method has a second parameter "type" which defaults to Hash.
+  # This is the class instance created in the resultset array (i.e.
+  # query returns [ type, type, type,...]).
+  # A block allows you to assign the k (column name) and v (value) to itm
+  # (a type.new taken from the second parameter) however you like.
   #
   # The following methods are convenience methods to access data for
   # models. As example a model Apple and its n:1 relation to Tree
@@ -86,14 +96,14 @@ module Ink
   # This will return a date in the form of 2012-11-20 10:00:02 and takes a Time
   # instance.
   #
-  # 
+  #
   #
   class Database
     private_class_method :new
     @@database = nil
-  
+
     # Private Constructor
-    # 
+    #
     # Uses the config parameter to create a database
     # connection, and will throw an error, if that is not
     # possible.
@@ -109,32 +119,32 @@ module Ink
         raise ArgumentError.new("Database undefined.")
       end
     end
-    
+
     # Class method
-    # 
+    #
     # Instanciates a new Database if none is found
     # [param config:] Hash of config parameters
     def self.create(config)
       @@database = new(config) if not @@database
     end
-    
+
     # Class method
-    # 
+    #
     # Removes an instanciated Database
     def self.drop
       @@database = nil if @@database
     end
-    
+
     # Class method
-    # 
+    #
     # Returns the Database instance or raises a Runtime Error
     # [returns:] Database instance
     def self.database
       (@@database) ? @@database : (raise RuntimeError.new("No Database found. Create one first"))
     end
-    
+
     # Instance method
-    # 
+    #
     # This will retrieve all tables nested into
     # the connected database.
     # [returns:] Array of tables
@@ -158,50 +168,59 @@ module Ink
       end
       result
     end
-    
+
     # Instance method
-    # 
+    #
     # Send an SQL query string to the database
     # and retrieve a result set
     # [param query:] SQL query string
     # [returns:] Array of Hashes of column_name => column_entry
-    def query(query)
+    def query(query, type=Hash)
+      type = Hash if not block_given?
       result = Array.new
       if @type == "mysql"
         re = @db.method("query").call query
         if re
           re.each_hash do |row|
-            result.push Hash.new
+            result.push type.new
             row.each do |k,v|
               if v =~ /^[0-9]+$/
                 v = $&.to_i
               elsif v =~ /^[0-9]+\.[0-9]+$/
                 v = $&.to_f
               end
-              result[result.length-1][k] = v
+              if block_given?
+                yield(result[result.length-1], k, v)
+              else
+                result[result.length-1][k] = v
+              end
             end
           end
         end
       elsif @type == "sqlite3"
         re = @db.method("query").call query
         re.each do |row|
-          result.push Hash.new
-          for i in 0...re.columns.length
+          result.push type.new
+          re.columns.each_index do |i|
             if row[i] =~ /^[0-9]+$/
               row[i] = $&.to_i
             elsif row[i] =~ /^[0-9]+\.[0-9]+$/
               row[i] = $&.to_f
             end
-            result[result.length-1][re.columns[i]] = row[i]
+            if block_given?
+              yield(result[result.length-1], re.columns[i], row[i])
+            else
+              result[result.length-1][re.columns[i]] = row[i]
+            end
           end
         end
         re.close if not re.closed?
       end
       result
     end
-    
+
     # Instance method
-    # 
+    #
     # Closes the database connection, there is no way
     # to reopen without creating a new Ink::Database instance
     def close
@@ -215,9 +234,9 @@ module Ink
       end
       self.class.drop
     end
-    
+
     # Instance method
-    # 
+    #
     # Attempts to fetch the last inserted primary key
     # [param class_name:] Defines the __table__ name or class
     # [returns:] primary key or nil
@@ -229,9 +248,9 @@ module Ink
       response = self.query("SELECT MAX(#{pk_name}) as id FROM #{table_name};")
       return (response.length > 0) ? response[0]["id"] : nil
     end
-    
+
     # Instance method
-    # 
+    #
     # Creates the SQL syntax for the chosen database type
     # to define a primary key, autoincrementing field
     # [returns:] SQL syntax for a primary key field
@@ -244,9 +263,9 @@ module Ink
       end
       result
     end
-    
+
     # Instance method
-    # 
+    #
     # Delete something from the database.
     # [param class_name:] Defines the class name or class
     # [param params:] Additional SQL syntax like WHERE conditions (optional)
@@ -255,9 +274,9 @@ module Ink
       return if not table_name
       self.query("DELETE FROM #{table_name} #{params};")
     end
-    
+
     # Instance method
-    # 
+    #
     # Retrieve class instances, that are loaded with the database result set.
     # [param class_name:] Defines the class name or class which should be queried
     # [param params:] Additional SQL syntax like WHERE conditions (optional)
@@ -267,7 +286,7 @@ module Ink
       result = Array.new
       table_name = c.table_name
       return result if not table_name
-      
+
       re = self.query("SELECT * FROM #{table_name} #{params};")
       re.each do |entry|
         instance = c.new entry
@@ -275,9 +294,9 @@ module Ink
       end
       result
     end
-    
+
     # Instance method
-    # 
+    #
     # Retrieve class2 instances, that are related to the class1 instance with
     # primary key class1_id. This is done via an additional relationship table.
     # Only relevant for many_many relationships.
@@ -308,9 +327,9 @@ module Ink
       end
       result
     end
-    
+
     # Instance method
-    # 
+    #
     # Retrieve class2 instances, that are related to the class1 instance with
     # primary key class1_id. Not relevant for many_many relationships
     # [param class1:] Reference classname or class
@@ -336,16 +355,16 @@ module Ink
       else
         re = self.query "SELECT * FROM #{tablename2} WHERE #{fk1} = #{class1_id} #{params};"
       end
-      
+
       re.each do |entry|
         instance = c2.new entry
         result.push instance
       end
       result
     end
-    
+
     # Instance method
-    # 
+    #
     # Retrieve one class2 instance, that is related to the class1 instance with
     # primary key class1_id. Only relevant for one_one and one_many relationships
     # [param class1:] Reference classname or class
@@ -361,9 +380,9 @@ module Ink
         nil
       end
     end
-    
+
     # Instance method
-    # 
+    #
     # This method attempts to remove all existing relationship data
     # of instance with link of type: type. For one_one relationships
     # this works only one way, requiring a second call later on before
@@ -392,9 +411,9 @@ module Ink
         @db.query "DELETE FROM #{union_class} WHERE #{instance.class.foreign_key[0]}=#{value};"
       end
     end
-    
+
     # Instance method
-    # 
+    #
     # Attempt to create links of instance to the data inside value.
     # link is the class of the related data, and type refers to the
     # relationship type of the two. When one tries to insert an array
@@ -422,9 +441,9 @@ module Ink
         self.create_link instance, link, type, fk
       end
     end
-    
+
     # Instance method
-    # 
+    #
     # Creates a link between instance and a link with primary fk.
     # The relationship between the two is defined by type. one_one
     # relationships are placing an additional call to delete_all_links
@@ -462,7 +481,7 @@ module Ink
         @db.query "INSERT INTO #{union_class} (#{instance.class.foreign_key[0]}, #{link.foreign_key[0]}) VALUES (#{value}, #{fk});"
       end
     end
-    
+
     # Class method
     #
     # Formats a Time object according to the SQL TimeDate standard
@@ -471,7 +490,7 @@ module Ink
     def self.format_date(date)
       (date.instance_of? Time) ? date.strftime("%Y-%m-%d %H:%M:%S") : ""
     end
-    
+
   end
-  
+
 end
