@@ -57,7 +57,7 @@ module Ink
   # an Array of objects.
   #
   #
-  # = Fields and foreign sample config
+  # == Fields and foreign sample config
   #
   #   class Apple < Ink::Model
   #     def self.fields
@@ -140,8 +140,12 @@ module Ink
         self.class.fields.each do |k,v|
           if data.is_a? Array
             raise LoadError.new("Model cannot be loaded, wrong number or arguments #{data.length} expected #{self.class.fields.length} or #{self.class.fields.length - 1}") if data.length < self.class.fields.length - 1 or data.length > self.class.fields.length
-            init_field k, data[i] if self.class.primary_key != k or data.length == self.class.fields.length
-            i += 1
+            if self.class.primary_key != k or data.length == self.class.fields.length
+              init_field k, data[i]
+              i += 1
+            else
+              init_field self.class.primary_key, nil
+            end
           else
             raise LoadError.new("Model cannot be loaded, argument missing: #{key}") if not data.key?(k.to_s) and self.class.primary_key != k
             init_field k, data[k.to_s]
@@ -258,28 +262,26 @@ module Ink
       string = Array.new
       keystring = Array.new
       valuestring = Array.new
-      fields = self.class.fields
       pkvalue = nil
-      for i in 0...fields.keys.length
-        k = fields.keys[i]
+      self.class.fields.each do |k,v|
         value = instance_variable_get "@#{k}"
-        value = "NULL" if not value
-        if k != self.class.primary_key[0]
+        value = "NULL" if value.nil?
+        if k != self.class.primary_key
           string.push "`#{k}`=#{(value.is_a?(Numeric)) ? value : "\'#{value}\'"}"
           keystring.push "`#{k}`"
           valuestring.push "#{(value.is_a?(Numeric)) ? value : "\'#{value}\'"}"
         else
-          pkvalue = "WHERE `#{self.class.primary_key[0]}`=#{(value.is_a?(Numeric)) ? value : "\'#{value}\'"}"
+          pkvalue = "WHERE `#{self.class.primary_key}`=#{(value.is_a?(Numeric)) ? value : "\'#{value}\'"}"
         end
       end
       if pkvalue
         response = Ink::Database.database.find self.class, pkvalue
-        if response.length == 1
-          Ink::Database.database.query "UPDATE #{self.class.table_name} SET #{string * ","} #{pkvalue};"
-        elsif response.length == 0
+        if response.empty?
           Ink::Database.database.query "INSERT INTO #{self.class.table_name} (#{keystring * ","}) VALUES (#{valuestring * ","});"
           pk = Ink::Database.database.last_inserted_pk(self.class)
-          instance_variable_set "@#{self.class.primary_key[0]}", pk.is_a?(Numeric) ? pk : "\'#{pk}\'" if pk
+          instance_variable_set "@#{self.class.primary_key}", pk.is_a?(Numeric) ? pk : "\'#{pk}\'" if pk
+        else
+          Ink::Database.database.query "UPDATE #{self.class.table_name} SET #{string * ","} #{pkvalue};"
         end
       end
 
@@ -321,7 +323,7 @@ module Ink
       relationship = self.class.foreign[c.class_name]
       if relationship
         result_array = (relationship == "many_many") ? Ink::Database.database.find_union(self.class, self.pk, c) : Ink::Database.database.find_references(self.class, self.pk, c)
-        instance_variable_set("@#{c.table_name}", (relationship =~ /^one_/) ? result_array[0] : result_array)
+        instance_variable_set("@#{c.table_name}", (relationship =~ /^one_/) ? result_array.first : result_array)
         true
       else
         false
@@ -340,26 +342,28 @@ module Ink
 
       string = "CREATE TABLE #{self.table_name} ("
       mfk = self.foreign_key
-      fields = self.fields
-      for i in 0...fields.keys.length
-        k = fields.keys[i]
-        string += "`#{k}` #{fields[k]*" "}" if k != self.primary_key[0]
-        string += "#{Ink::Database.database.primary_key_autoincrement(k)*" "}" if k == self.primary_key[0]
-        string += "," if i < fields.keys.length - 1
-      end
+      string += self.fields.map do |k,v|
+        if k != self.primary_key
+          "`#{k}` #{v*" "}"
+        else
+          "#{Ink::Database.database.primary_key_autoincrement(k)*" "}"
+        end
+      end.join(",")
 
       if self.respond_to? :foreign
-        foreign = self.foreign
-        for i in 0...foreign.keys.length
-          k = foreign.keys[i]
-          v = foreign[k]
-          fk = Ink::Model::classname(k).foreign_key
-          string += ",`#{fk[0]}` #{fk[1]}" if fk.length > 0 and (v == "one_many" or (v == "one_one" and (self.name <=> k) < 0))
-
-          if mfk.length > 0 and fk.length > 1 and v == "many_many" and (self.name <=> k) < 0
-            result.push "CREATE TABLE #{self.table_name}_#{Ink::Model::str_to_tablename(k)} (#{Ink::Database.database.primary_key_autoincrement*" "}, `#{mfk[0]}` #{mfk[1]}, `#{fk[0]}` #{fk[1]});"
-          end
-        end
+         tmp = self.foreign.map do |k,v|
+           f_class = Ink::Model::classname(k)
+           if v == "many_many" and (self.name <=> k) < 0
+             result.push "CREATE TABLE #{self.table_name}_#{Ink::Model::str_to_tablename(k)} (#{Ink::Database.database.primary_key_autoincrement*" "}, `#{self.foreign_key}` #{self.foreign_key_type}, `#{f_class.foreign_key}` #{f_class.foreign_key_type});"
+             nil
+           end
+           if v == "one_many" or (v == "one_one" and (self.name <=> k) < 0)
+             "`#{f_class.foreign_key}` #{f_class.foreign_key_type}"
+           else
+             nil
+           end
+         end.compact.join(",")
+         string += ",#{tmp}" if not tmp.empty?
       end
       string += ");"
       result.push string

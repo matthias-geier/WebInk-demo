@@ -188,6 +188,8 @@ module Ink
                 v = $&.to_i
               elsif v =~ /^[0-9]+\.[0-9]+$/
                 v = $&.to_f
+              elsif v =~ /^NULL$/
+                v = nil
               end
               if block_given?
                 yield(result[result.length-1], k, v)
@@ -206,6 +208,8 @@ module Ink
               row[i] = $&.to_i
             elsif row[i] =~ /^[0-9]+\.[0-9]+$/
               row[i] = $&.to_f
+            elsif row[i] =~ /^NULL$/
+              row[i] = nil
             end
             if block_given?
               yield(result[result.length-1], re.columns[i], row[i])
@@ -241,12 +245,12 @@ module Ink
     # [param class_name:] Defines the __table__ name or class
     # [returns:] primary key or nil
     def last_inserted_pk(class_name)
-      c = (class_name.is_a? Class) ? class_name : Ink::Model.classname(class_name)
-      table_name = c.table_name
-      pk_name = c.primary_key[0]
-      return if not (table_name and pk_name)
+      class_name = Ink::Model.classname(class_name) unless class_name.is_a? Class
+      table_name = class_name.table_name
+      pk_name = class_name.primary_key
+      return if table_name.nil? or pk_name.nil?
       response = self.query("SELECT MAX(#{pk_name}) as id FROM #{table_name};")
-      return (response.length > 0) ? response[0]["id"] : nil
+      return (response.empty?) ? nil : response.first["id"]
     end
 
     # Instance method
@@ -271,7 +275,7 @@ module Ink
     # [param params:] Additional SQL syntax like WHERE conditions (optional)
     def remove(class_name, params="")
       table_name = (class_name.is_a? Class) ? class_name.table_name : Ink::Model.str_to_tablename(class_name)
-      return if not table_name
+      return if table_name.nil?
       self.query("DELETE FROM #{table_name} #{params};")
     end
 
@@ -282,14 +286,14 @@ module Ink
     # [param params:] Additional SQL syntax like WHERE conditions (optional)
     # [returns:] Array of class_name instances from the SQL result set
     def find(class_name, params="")
-      c = (class_name.is_a? Class) ? class_name : Ink::Model.classname(class_name)
+      class_name = Ink::Model.classname(class_name) unless class_name.is_a? Class
       result = Array.new
-      table_name = c.table_name
-      return result if not table_name
+      table_name = class_name.table_name
+      return result if table_name.nil?
 
       re = self.query("SELECT * FROM #{table_name} #{params};")
       re.each do |entry|
-        instance = c.new entry
+        instance = class_name.new entry
         result.push instance
       end
       result
@@ -306,23 +310,25 @@ module Ink
     # [param params:] Additional SQL syntax like GROUP BY (optional)
     # [returns:] Array of class2 instances from the SQL result set
     def find_union(class1, class1_id, class2, params="")
-      c1 = (class1.is_a? Class) ? class1 : Ink::Model.classname(class1)
-      c2 = (class2.is_a? Class) ? class2 : Ink::Model.classname(class2)
+      class1 = Ink::Model.classname(class1) unless class1.is_a? Class
+      class2 = Ink::Model.classname(class2) unless class2.is_a? Class
       result = Array.new
       relationship = nil
-      c1.foreign.each do |k,v|
-        relationship = v if k.downcase == c2.class_name.downcase
+      class1.foreign.each do |k,v|
+        relationship = v if k == class2.class_name
       end
       return result if relationship != "many_many"
-      fk1 = c1.foreign_key[0]
-      pk2 = c2.primary_key[0]
-      fk2 = c2.foreign_key[0]
-      tablename1 = c1.table_name
-      tablename2 = c2.table_name
-      union_class = ((c1.class_name.downcase <=> c2.class_name.downcase) < 0) ? "#{tablename1}_#{tablename2}" : "#{tablename2}_#{tablename1}"
+      fk1 = class1.foreign_key
+      pk2 = class2.primary_key
+      fk2 = class2.foreign_key
+      tablename1 = class1.table_name
+      tablename2 = class2.table_name
+      union_class = ((class1.class_name <=> class2.class_name) < 0) ?
+        "#{tablename1}_#{tablename2}" :
+        "#{tablename2}_#{tablename1}"
       re = self.query("SELECT #{tablename2}.* FROM #{union_class}, #{tablename2} WHERE #{union_class}.#{fk1} = #{class1_id} AND #{union_class}.#{fk2} = #{tablename2}.#{pk2} #{params};")
       re.each do |entry|
-        instance = c2.new entry
+        instance = class2.new entry
         result.push instance
       end
       result
@@ -338,26 +344,26 @@ module Ink
     # [param params:] Additional SQL syntax like GROUP BY (optional)
     # [returns:] Array of class2 instances from the SQL result set
     def find_references(class1, class1_id, class2, params="")
-      c1 = (class1.is_a? Class) ? class1 : Ink::Model.classname(class1)
-      c2 = (class2.is_a? Class) ? class2 : Ink::Model.classname(class2)
+      class1 = Ink::Model.classname(class1) unless class1.is_a? Class
+      class2 = Ink::Model.classname(class2) unless class2.is_a? Class
       result = Array.new
       relationship = nil
-      c1.foreign.each do |k,v|
-        relationship = v if k.downcase == c2.class_name.downcase
+      class1.foreign.each do |k,v|
+        relationship = v if k == class2.class_name
       end
       return result if relationship == "many_many"
       re = Array.new
-      fk1 = c1.foreign_key[0]
-      tablename1 = c1.table_name
-      tablename2 = c2.table_name
-      if ((c1.class_name.downcase <=> c2.class_name.downcase) < 0 and relationship == "one_one") or relationship == "one_many"
-        re = self.query "SELECT * FROM #{tablename2} WHERE #{c2.primary_key[0]}=(SELECT #{c2.foreign_key[0]} FROM #{tablename1} WHERE #{c1.primary_key[0]}=#{class1_id});"
+      fk1 = class1.foreign_key
+      tablename1 = class1.table_name
+      tablename2 = class2.table_name
+      if ((class1.class_name <=> class2.class_name) < 0 and relationship == "one_one") or relationship == "one_many"
+        re = self.query "SELECT * FROM #{tablename2} WHERE #{class2.primary_key}=(SELECT #{class2.foreign_key} FROM #{tablename1} WHERE #{class1.primary_key}=#{class1_id});"
       else
         re = self.query "SELECT * FROM #{tablename2} WHERE #{fk1} = #{class1_id} #{params};"
       end
 
       re.each do |entry|
-        instance = c2.new entry
+        instance = class2.new entry
         result.push instance
       end
       result
@@ -375,7 +381,7 @@ module Ink
     def find_reference(class1, class1_id, class2, params="")
       result_array = self.find_references class1, class1_id, class2, params
       if result_array.length == 1
-        result_array[0]
+        result_array.first
       else
         nil
       end
@@ -394,21 +400,21 @@ module Ink
       if type == "one_one"
         firstclass = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? instance.class : link
         secondclass = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? link : instance.class
-        key = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? instance.class.primary_key[0] : instance.class.foreign_key[0]
-        value = instance.method(instance.class.primary_key[0]).call
-        @db.query "UPDATE #{firstclass.table_name} SET #{secondclass.foreign_key[0]}=NULL WHERE #{key}=#{value};"
+        key = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? instance.class.primary_key : instance.class.foreign_key
+        value = instance.method(instance.class.primary_key).call
+        @db.query "UPDATE #{firstclass.table_name} SET #{secondclass.foreign_key}=NULL WHERE #{key}=#{value};"
       elsif type == "one_many" or type == "many_one"
         firstclass = (type == "one_many") ? instance.class : link
         secondclass = (type == "one_many") ? link : instance.class
-        key = (type == "one_many") ? instance.class.primary_key[0] : instance.class.foreign_key[0]
-        value = instance.method(instance.class.primary_key[0]).call
-        @db.query "UPDATE #{firstclass.table_name} SET #{secondclass.foreign_key[0]}=NULL WHERE #{key}=#{value};"
+        key = (type == "one_many") ? instance.class.primary_key : instance.class.foreign_key
+        value = instance.method(instance.class.primary_key).call
+        @db.query "UPDATE #{firstclass.table_name} SET #{secondclass.foreign_key}=NULL WHERE #{key}=#{value};"
       elsif type == "many_many"
         tablename1 = instance.class.table_name
         tablename2 = link.table_name
         union_class = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? "#{tablename1}_#{tablename2}" : "#{tablename2}_#{tablename1}"
-        value = instance.method(instance.class.primary_key[0]).call
-        @db.query "DELETE FROM #{union_class} WHERE #{instance.class.foreign_key[0]}=#{value};"
+        value = instance.method(instance.class.primary_key).call
+        @db.query "DELETE FROM #{union_class} WHERE #{instance.class.foreign_key}=#{value};"
       end
     end
 
@@ -427,13 +433,13 @@ module Ink
       if value.is_a? Array
         value.each do |v|
           if v.instance_of? link
-            to_add.push(v.method(link.primary_key[0]).call)
+            to_add.push(v.method(link.primary_key).call)
           else
             to_add.push v
           end
         end
       elsif value.instance_of? link
-        to_add.push(value.method(link.primary_key[0]).call)
+        to_add.push(value.method(link.primary_key).call)
       else
         to_add.push value
       end
@@ -455,30 +461,30 @@ module Ink
     def create_link(instance, link, type, fk)
       if type == "one_one"
         if (instance.class.name.downcase <=> link.name.downcase) < 0
-          re = self.find(link.name, "WHERE #{link.primary_key[0]}=#{fk};")[0]
+          re = self.find(link.name, "WHERE #{link.primary_key}=#{fk};").first
           self.delete_all_links re, instance.class, type
         end
         firstclass = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? instance.class : link
         secondclass = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? link : instance.class
-        key = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? instance.class.primary_key[0] : link.primary_key[0]
-        value = instance.method(instance.class.primary_key[0]).call
+        key = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? instance.class.primary_key : link.primary_key
+        value = instance.method(instance.class.primary_key).call
         fk_set = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? fk : value
         value_set = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? value : fk
-        @db.query "UPDATE #{firstclass.table_name} SET #{secondclass.foreign_key[0]}=#{fk} WHERE #{key}=#{value};"
+        @db.query "UPDATE #{firstclass.table_name} SET #{secondclass.foreign_key}=#{fk} WHERE #{key}=#{value};"
       elsif type == "one_many" or type == "many_one"
         firstclass = (type == "one_many") ? instance.class : link
         secondclass = (type == "one_many") ? link : instance.class
-        key = (type == "one_many") ? instance.class.primary_key[0] : link.primary_key[0]
-        value = instance.method(instance.class.primary_key[0]).call
+        key = (type == "one_many") ? instance.class.primary_key : link.primary_key
+        value = instance.method(instance.class.primary_key).call
         fk_set = (type == "one_many") ? fk : value
         value_set = (type == "one_many") ? value : fk
-        @db.query "UPDATE #{firstclass.table_name} SET #{secondclass.foreign_key[0]}=#{fk_set} WHERE #{key}=#{value_set};"
+        @db.query "UPDATE #{firstclass.table_name} SET #{secondclass.foreign_key}=#{fk_set} WHERE #{key}=#{value_set};"
       elsif type == "many_many"
         tablename1 = instance.class.table_name
         tablename2 = link.table_name
         union_class = ((instance.class.name.downcase <=> link.name.downcase) < 0) ? "#{tablename1}_#{tablename2}" : "#{tablename2}_#{tablename1}"
-        value = instance.method(instance.class.primary_key[0]).call
-        @db.query "INSERT INTO #{union_class} (#{instance.class.foreign_key[0]}, #{link.foreign_key[0]}) VALUES (#{value}, #{fk});"
+        value = instance.method(instance.class.primary_key).call
+        @db.query "INSERT INTO #{union_class} (#{instance.class.foreign_key}, #{link.foreign_key}) VALUES (#{value}, #{fk});"
       end
     end
 

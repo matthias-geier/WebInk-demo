@@ -1,3 +1,5 @@
+#!/usr/bin/env ruby
+
 require "fcgi"
 require "simple_mmap"
 require "webink/beauty"
@@ -43,7 +45,7 @@ FCGI.each_cgi do |cgi|
     control = eval fhandle.read_window_data(0,fhandle.size), getBinding(cgi,cgi.env_table,control) if fhandle
     fhandle.close
     raise StandardError.new("Routes not matched.") if control.keys.length <= 1
-    
+
     control[:get] = pram
     control[:config] = Ink::Beauty.load_config script
     control[:time] = time
@@ -70,13 +72,13 @@ FCGI.each_cgi do |cgi|
     else
       cgi.params = pram
     end
-    
+
     script = Ink::Beauty.load_init script
     fhandle = SimpleMmap::MappedFile.new(script)
     Dir.chdir( File.dirname(script) )
     eval fhandle.read_window_data(0,fhandle.size), getBinding(cgi,cgi.env_table,control) if fhandle
     fhandle.close
-    
+
   rescue LoadError => bang
     if is_production
       puts cgi.header({"Location" => "/status-404.html"}) if use_errors
@@ -85,7 +87,7 @@ FCGI.each_cgi do |cgi|
       puts cgi.header
       puts "<hr><b>LoadError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
     end
-    
+
   rescue NotImplementedError => bang
     if is_production
       puts cgi.header({"Location" => "/status-500.html"}) if use_errors
@@ -94,7 +96,7 @@ FCGI.each_cgi do |cgi|
       puts cgi.header
       puts "<hr><b>NotImplementedError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
     end
-    
+
   rescue ArgumentError => bang
     if is_production
       puts cgi.header({"Location" => "/status-500.html"}) if use_errors
@@ -103,7 +105,7 @@ FCGI.each_cgi do |cgi|
       puts cgi.header
       puts "<hr><b>ArgumentError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
     end
-    
+
   rescue RuntimeError => bang
     if is_production
       puts cgi.header({"Location" => "/status-500.html"}) if use_errors
@@ -112,7 +114,7 @@ FCGI.each_cgi do |cgi|
       puts cgi.header
       puts "<hr><b>RuntimeError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
     end
-  
+
   rescue NameError => bang
     if is_production
       puts cgi.header({"Location" => "/status-500.html"}) if use_errors
@@ -121,7 +123,7 @@ FCGI.each_cgi do |cgi|
       puts cgi.header
       puts "<hr><b>NameError:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
     end
-    
+
   rescue Exception, StandardError => bang
     if is_production
       puts cgi.header({"Location" => "/status-500.html"}) if use_errors
@@ -131,7 +133,7 @@ FCGI.each_cgi do |cgi|
       puts "<hr><b>Exception:</b>", "<em><pre>", CGI::escapeHTML("#{bang}"), "</pre></em>\n", "<pre>", bang.backtrace.join("\n"), "</pre>"
     end
   end
-  
+
   script = nil
   fhandle = nil
   control = nil

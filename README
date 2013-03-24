@@ -29,7 +29,7 @@ to the configuration. Inside your /etc/lighttpd folder you
 find a config file "lighttpd.conf". Here you enter the details
 the server should respect. Probably inside a
 
-  $HTTP["host"] =~ "something" { 
+  $HTTP["host"] =~ "something" {
     ...
   }
 
@@ -219,7 +219,7 @@ code into it.
         echo "Usage: init-fastcgi {start|stop|restart}"
         exit 1
     ;;
-  esac      
+  esac
   exit $RETVAL
 
 You can start, stop and restart the rfcgi process now, as long as the path
@@ -371,3 +371,11 @@ routes.rb.
 
 For more information on the folders, have a look at the sample project.
 
+== Testing
+
+A small unit test suite is provided in the github repos. You can run it by
+cloning the github repos, navigating into the folder and running
+
+  ruby test/run.rb
+
+WebInk can be unit tested quite easily.
