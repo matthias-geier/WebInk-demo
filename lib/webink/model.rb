@@ -309,8 +309,8 @@ module Ink
         end
       end
 
-      pkvalue = instance_variable_get "@#{self.class.primary_key[0]}"
-      Ink::Database.database.remove self.class.name, "WHERE `#{self.class.primary_key[0]}`=#{(pkvalue.is_a?(Numeric)) ? pkvalue : "\'#{pkvalue}\'"}"
+      pkvalue = instance_variable_get "@#{self.class.primary_key}"
+      Ink::Database.database.remove self.class.name, "WHERE `#{self.class.primary_key}`=#{(pkvalue.is_a?(Numeric)) ? pkvalue : "\'#{pkvalue}\'"}"
     end
 
     # Instance method

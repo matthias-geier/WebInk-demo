@@ -181,9 +181,12 @@ module Ink
       if @type == "mysql"
         re = @db.method("query").call query
         if re
-          re.each_hash do |row|
+          keys = re.fetch_fields.map(&:name)
+          re.each do |row|
             result.push type.new
-            row.each do |k,v|
+            row.each_index do |i|
+              k = keys[i]
+              v = row[i]
               if v =~ /^[0-9]+$/
                 v = $&.to_i
               elsif v =~ /^[0-9]+\.[0-9]+$/
