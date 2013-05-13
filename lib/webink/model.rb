@@ -163,24 +163,33 @@ module Ink
       end
     end
 
+    # Class method
+    #
+    # Similar to making an Object sql safe.
+    # Escapes quotes.
+    # [param value:] Object
+    # [returns:] safe Object
+    def self.make_safe(value)
+      if value.nil?
+        nil
+      elsif value.is_a? String
+        value.gsub(/'/, '&#39;')
+      elsif value.is_a? Numeric
+        value
+      else
+        "\'#{value}\'"
+      end
+    end
+
     # Private instance method
     #
     # Provides an instance accessor and setter for the key. It is
     # initialized with data[key].
     # [key:] String
-    # [data:] Hash of String => Object
+    # [value:] Object
     def init_field(key, value)
       raise NameError.new("Model cannot use #{key} as field, it is blocked by primary key") if key.to_s.downcase == "pk"
-      entry = nil
-      if value.nil?
-        entry = nil
-      elsif value.is_a? String
-        entry = value.gsub(/'/, '&#39;')
-      elsif value.is_a? Numeric
-        entry = value
-      else
-        entry = "\'#{value}\'"
-      end
+      entry = self.class.make_safe(value)
       instance_variable_set("@#{key}", entry)
 
       if not self.respond_to? key
@@ -191,15 +200,7 @@ module Ink
       if self.class.primary_key != key
         if not self.respond_to? "#{key}="
           self.class.send(:define_method, "#{key}=") do |val|
-            if val.nil?
-              val = nil
-            elsif val.is_a? String
-              val = val.gsub(/'/, '&#39;')
-            elsif val.is_a? Numeric
-              val = val
-            else
-              val = "\'#{val}\'"
-            end
+            val = self.class.make_safe(val)
             instance_variable_set "@#{key}", val
           end
         end
@@ -218,16 +219,7 @@ module Ink
     # [key:] String
     # [value:] Object
     def init_no_fields(key, value)
-      entry = nil
-      if value.nil?
-        entry = nil
-      elsif value.is_a? String
-        entry = value.gsub(/'/, '&#39;')
-      elsif value.is_a? Numeric
-        entry = value
-      else
-        entry = "\'#{value}\'"
-      end
+      entry = self.class.make_safe(value)
       instance_variable_set "@#{key}", entry
     end
     private :init_no_fields

@@ -169,6 +169,44 @@ module Ink
       result
     end
 
+    # Class method
+    #
+    # Transform a value to sql representative values.
+    # This means quotes are escaped, nils are transformed
+    # and everything else is quoted.
+    # [param value:] Object
+    # [returns:] transformed String
+    def self.transform_to_sql(value)
+      if value.nil?
+        "NULL"
+      elsif value.is_a? String
+        "\'#{value.gsub(/'/, '&#39;')}\'"
+      elsif value.is_a? Numeric
+        value
+      else
+        "\'#{value}\'"
+      end
+    end
+
+    # Class method
+    #
+    # Transform a value from sql to objects.
+    # This means nils, integer, floats and strings
+    # are imported correctly.
+    # [param value:] String
+    # [returns:] Object
+    def self.transform_from_sql(value)
+      if value =~ /^NULL$/
+        nil
+      elsif value =~ /^\d+$/
+        value.to_i
+      elsif value =~ /^\d+\.\d+$/
+        value.to_f
+      else
+        value
+      end
+    end
+
     # Instance method
     #
     # Send an SQL query string to the database
@@ -186,14 +224,7 @@ module Ink
             result.push type.new
             row.each_index do |i|
               k = keys[i]
-              v = row[i]
-              if v =~ /^[0-9]+$/
-                v = $&.to_i
-              elsif v =~ /^[0-9]+\.[0-9]+$/
-                v = $&.to_f
-              elsif v =~ /^NULL$/
-                v = nil
-              end
+              v = self.class.transform_from_sql(row[i])
               if block_given?
                 yield(result[result.length-1], k, v)
               else
@@ -207,13 +238,7 @@ module Ink
         re.each do |row|
           result.push type.new
           re.columns.each_index do |i|
-            if row[i] =~ /^[0-9]+$/
-              row[i] = $&.to_i
-            elsif row[i] =~ /^[0-9]+\.[0-9]+$/
-              row[i] = $&.to_f
-            elsif row[i] =~ /^NULL$/
-              row[i] = nil
-            end
+            row[i] = self.class.transform_from_sql(row[i])
             if block_given?
               yield(result[result.length-1], re.columns[i], row[i])
             else
