@@ -3,12 +3,12 @@
 <div>
 <%= @post.text %>
 </div>
-<p><%= @post.tags %> --- <%= @post.created_at %> by <%= @post.user[0].loginname %></p>
+<p><%= @post.tags %> --- <%= @post.created_at %> by <%= @post.user.loginname %></p>
 
 <div>
 <h4>Comments</h4>
 <% for comment in @post.comment %>
-  <p><%= comment.title %> (<%= comment.created_at %>) by <%= comment.user[0].loginname %>:<br>
+  <p><%= comment.title %> (<%= comment.created_at %>) by <%= comment.user.loginname %>:<br>
   <%= comment.text %></p>
 <% end %>
 

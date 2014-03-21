@@ -1,14 +1,33 @@
 
 class User < Ink::Model
 
+  def self.fields
+    fields = {
+      :ref => "PRIMARY KEY",
+      :loginname => [ "VARCHAR(200)", "NOT NULL", "UNIQUE" ],
+      :pass => [ "VARCHAR(200)", "NOT NULL" ],
+      :signup_date => [ "DATETIME", "NOT NULL" ],
+      :salt => [ "VARCHAR(255)", "NOT NULL" ],
+      :cookie_hash => [ "VARCHAR(255)" ],
+    }
+    fields
+  end
+
+  def self.foreign
+    foreign = {
+      "Role" => "many_many",
+      "Entry" => "many_one",
+      "Comment" => "many_one",
+    }
+    foreign
+  end
+
   # Instance method
   # Determines user roles by looking them up in the database
   # A possible optimization could be to store the user-roles
   # in this instance from the start
   def can?(str)
-    result = Ink::Database.database.find_union "user", self.pk, "role",
-      "AND role.role=\"#{str}\""
-    result[0]
+    self.find_references(Role).detect{ |r| r.role.include?(str) }
   end
 
   # Class method
@@ -24,7 +43,7 @@ class User < Ink::Model
   # Encrypt the password and store it. This is a convenience method
   # to prevent code relocation
   def password=(pass)
-    @salt = User.random_string(12) if not @salt or @salt.length == 0
+    @salt = User.random_string(12) if !@salt || @salt.length == 0
     @pass = User.encrypt(pass, @salt)
   end
 
@@ -39,12 +58,17 @@ class User < Ink::Model
   # is the cookie session_id. If more users are returned,
   # unset the hashes with those users.
   def self.auth_cookie(hash)
-    user = Ink::Database.database.find "user", "WHERE cookie_hash=\"#{hash}\""
+    user = User.find do |s|
+      s.where("cookie_hash=#{Ink::SqlAdapter.transform_to_sql(hash)}")
+    end
     if user.length > 1
-      user.each do |u| u.cookie_hash = nil; u.save end
+      user.each do |u|
+        u.cookie_hash = nil
+        u.save
+      end
       return nil
     end
-    return nil if not hash or hash.length == 0
+    return nil if !hash || hash.length == 0
     user.first
   end
 
@@ -67,29 +91,11 @@ class User < Ink::Model
   # Class method
   # Try to authenticate a user with a given password.
   def self.authenticate(login, pass)
-    user = Ink::Database.database.find "user", "WHERE loginname=\"#{login}\""
+    user = User.find do |s|
+      s.where("loginname=#{Ink::SqlAdapter.transform_to_sql(login)}")
+    end
     return nil if user.length != 1
     (User.encrypt(pass, user.first.salt) == user.first.pass) ? user.first : nil
   end
 
-  def self.fields
-    fields = {
-      :ref => "PRIMARY KEY",
-      :loginname => [ "VARCHAR(200)", "NOT NULL", "UNIQUE" ],
-      :pass => [ "VARCHAR(200)", "NOT NULL" ],
-      :signup_date => [ "DATETIME", "NOT NULL" ],
-      :salt => [ "VARCHAR(255)", "NOT NULL" ],
-      :cookie_hash => [ "VARCHAR(255)", "NOT NULL" ],
-    }
-    fields
-  end
-
-  def self.foreign
-    foreign = {
-      "Role" => "many_many",
-      "Entry" => "many_one",
-      "Comment" => "many_one",
-    }
-    foreign
-  end
 end

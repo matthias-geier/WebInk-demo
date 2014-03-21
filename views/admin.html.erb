@@ -10,9 +10,9 @@
   <% if @message %>
     <div style="color:red;"><%= @message %></div>
   <% end %>
-  
+
   <div style="float:left; width: 14em;">
-  <% if not @user %>
+  <% if !@user %>
     <%= link_to "Login", @params[:controller], "index" %><br>
     <%= link_to "Register", @params[:controller], "register" %><br>
   <% else %>
@@ -25,7 +25,7 @@
     <%= link_to "Logout", @params[:controller], "logout" %><br>
   <% end %>
   </div>
-  
+
   <div style="margin-left: 16em;">
     <%= locals[0] if locals.length > 0 %>
   </div>

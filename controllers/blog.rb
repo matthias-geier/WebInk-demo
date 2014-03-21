@@ -14,17 +14,16 @@ class Blog < Ink::Controller
     # the database table is ordered by descending creation date
     # this limits the amount of entries and therefore letting the
     # database do the work (which is much faster  and memory efficient anyway)
-    @posts = Ink::Database.database.find "entry",
-      "ORDER BY `created_at` DESC LIMIT #{@steps+1} OFFSET #{(@page-1)*@steps}"
+    @posts = Entry.find do |s|
+      s.order.by("created_at").desc.limit(@steps+1).offset((@page-1)*@steps)
+    end
 
     # retrieve the users and comments attached to the entry.
     # there is only one author of the entry, yet find_references will
     # return an array of size 1 to be consistent
     @posts.each do |post|
-      post.user = Ink::Database.database.find_references "entry", post.pk,
-        "user"
-      post.comment = Ink::Database.database.find_references "entry", post.pk,
-        "comment"
+      post.find_references(User)
+      post.find_references(Comment)
     end
 
     # the database query earlier used LIMIT @steps+1, which we
@@ -34,7 +33,7 @@ class Blog < Ink::Controller
     # before.
     @has_more = (@posts.length > @steps)
     @has_less = (@page > 1)
-    @posts.delete_at @posts.length-1 if @posts.length > @steps
+    @posts.delete_at(@posts.length-1) if @posts.length > @steps
 
     # render the template index.html.erb and pass a partial through
     # via :locals. The partial can be accessed inside the template
@@ -54,34 +53,25 @@ class Blog < Ink::Controller
     @id = @params[:page].to_i
 
     # retrieve the entry by id (i.e. the primary key that can conveniently
-    # be retrieved by Modelname.primary_key (array of length 2 consisting of
-    # [primary key name, primary key type]))
-    @post = Ink::Database.database.find "entry",
-      "WHERE #{Entry.primary_key}=#{@id}"
-
-    # database results are arrays, in this case it has length 1, so we remove
-    # the array
-    @post = (@post.is_a? Array) ? @post[0] : nil
+    # be retrieved by Modelname.primary_key)
+    @post = Entry.find{ |s| s.where("#{Entry.primary_key}=#{@id}") }.first
 
     # retrieve the users attached to the entry (it's just the author)
-    @post.user = Ink::Database.database.find_references "entry", @post.pk,
-      "user"
+    @post.find_references(User)
 
     # when a user sends a comment, this will be processed here
-    if @params[:post] and @params[:post]["submit"] == "Add"
+    if @params[:post] && @params[:post]["submit"] == "Add"
       # if there was no session, the user had to specify username and password,
       # that we authenticate here
-      user = (not @u) ?
-        User.authenticate(@params[:post]["user"], @params[:post]["pass"]) : @u
+      user = @u || User.authenticate(@params[:post]["user"],
+        @params[:post]["pass"])
 
       # once the commenting user is found, determine if he is allowed to comment
-      if user and user.can? "Comment"
-        # create a new comment, set its relations to this entry and the commenting user and save
-        c = Comment.new(
-          "title" => @params[:post]["title"],
-          "text" => @params[:post]["text"],
-          "created_at" => Ink::Database.format_date(Time.now)
-        )
+      if user && user.can?("Comment")
+        # create a new comment, set its relations to this entry and the
+        # commenting user and save
+        c = Comment.new(@params[:post].merge({ 'created_at' =>
+          Ink::Database.format_date(Time.now) }))
         c.entry = @post
         c.user = user
         c.save
@@ -90,11 +80,11 @@ class Blog < Ink::Controller
 
     # retrieve the comments from this entry in ascending order and
     # attach its author to each
-    @post.comment = Ink::Database.database.find_references "entry", @id,
-      "comment", "ORDER BY comment.created_at ASC"
+    @post.comment = @post.find_references(Comment) do |s|
+      s.order.by('created_at').asc
+    end
     @post.comment.each do |comm|
-      comm.user = Ink::Database.database.find_references "comment", comm.pk,
-        "user"
+      comm.find_references(User)
     end
 
     # rendering is similar to the one in the index module

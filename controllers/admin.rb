@@ -50,17 +50,13 @@ class Admin < Ink::Controller
     u = User.auth_cookie(session)
 
     # prevent access to this page without necessary user role
-    if u and not u.can? "Post new"
+    if u && !u.can?("Post new")
       render :template => "admin", :locals => [ "Access forbidden" ]
     elsif u
       # handle a new entry that is provided through POST
       if @params[:post] and @params[:post]["submit"] == "Create"
-        e = Entry.new(
-          "title" => @params[:post]["title"],
-          "text" => @params[:post]["text"],
-          "tags" => @params[:post]["tags"],
-          "created_at" => Ink::Database.format_date(Time.now)
-        )
+        e = Entry.new(@params[:post].merge({ 'created_at' =>
+          Ink::Database.format_date(Time.now) }))
         e.user = u
         e.save
 
@@ -82,51 +78,47 @@ class Admin < Ink::Controller
     session = User.session_instance(@params)
     self.set_session_data!
     u = User.auth_cookie(session)
-    if u and not (u.can?("Post edit") or u.can?("Post delete"))
+    if u && !(u.can?("Post edit") || u.can?("Post delete"))
       render :template => "admin", :locals => [ "Access forbidden" ]
     elsif u
       # retrieve all entries of the logged in user
-      @posts = Ink::Database.database.find_references "user", u.pk, "entry",
-        "ORDER BY entry.created_at DESC"
+      @posts = u.find_references(Entry) do |s|
+        s.order.by('entry.created_at').desc
+      end
 
       # prevent restricted users to edit or delete posts
-      if u.can?("Post edit") and @params[:post] and
+      if u.can?("Post edit") && @params[:post] &&
           @params[:post]["submit"] == "Edit"
-        ref = @params[:post]["ref"]
-        editpost = Ink::Database.database.find "entry",
-          "WHERE #{Entry.primary_key}=#{ref}"
-        if editpost[0]
-          edituser = Ink::Database.database.find_references "entry",
-            editpost[0].pk, "user"
+        ref = Ink::SqlAdapter.transform_to_sql(@params[:post]["ref"])
+        editpost = Entry.find{ |s| s.where("`#{Entry.primary_key}`=#{ref}") }.
+          first
+        if editpost
+          edituser = editpost.find_references(User)
         end
 
         # make sure the logged in user is also the author
-        if editpost[0] and edituser and edituser[0] and edituser[0].pk == u.pk
-          editpost[0].title = @params[:post]["title"]
-          editpost[0].text = @params[:post]["text"]
-          editpost[0].tags = @params[:post]["tags"]
-          editpost[0].save
-          @message = "Post #{editpost[0].title} successfully updated."
+        if editpost && edituser && edituser.pk == u.pk
+          editpost.update_fields(@params[:post])
+          editpost.save
+          @message = "Post #{editpost.title} successfully updated."
         end
-      elsif u.can?("Post delete") and @params[:post] and
+      elsif u.can?("Post delete") && @params[:post] &&
           @params[:post]["submit"] == "Delete"
-        ref = @params[:post]["ref"]
-        post = Ink::Database.database.find "entry",
-          "WHERE #{Entry.primary_key}=#{ref}"
-        comments = Ink::Database.database.find_references "entry", ref,
-          "comment"
-        if editpost[0]
-          edituser = Ink::Database.database.find_reference "entry",
-            editpost[0].pk, "user"
+        ref = Ink::SqlAdapter.transform_to_sql(@params[:post]["ref"])
+        post = Entry.find{ |s| s.where("`#{Entry.primary_key}`=#{ref}") }.
+          first
+        if post
+          comments = post.find_references(Comment)
+          edituser = post.find_references(User)
         end
 
         # comments need to be deleted before the post is gone, or
         # they will linger inside the database without reference
-        if post[0] and edituser and edituser[0] and edituser[0].pk == u.pk
+        if post && edituser && edituser.pk == u.pk
           comments.each{ |c| c.delete }
-          post[0].delete
+          post.delete
           @message =
-            "Post #{post[0].title} with all comments successfully deleted."
+            "Post #{post.title} with all comments successfully deleted."
         end
       end
 
@@ -143,33 +135,32 @@ class Admin < Ink::Controller
     session = User.session_instance(@params)
     self.set_session_data!
     u = User.auth_cookie(session)
-    if u and not u.can? "Post administrate"
+    if u && !u.can?("Post administrate")
       render :template => "admin", :locals => [ "Access forbidden" ]
     elsif u
-      @posts = Ink::Database.database.find "entry", "ORDER BY created_at DESC"
+      @posts = u.find_references(Entry) do |s|
+        s.order.by('entry.created_at').desc
+      end
 
-      if @params[:post] and @params[:post]["submit"] == "Edit"
-        ref = @params[:post]["ref"]
-        editpost = Ink::Database.database.find "entry",
-          "WHERE #{Entry.primary_key}=#{ref}"
-        if editpost[0]
-          editpost[0].title = @params[:post]["title"]
-          editpost[0].text = @params[:post]["text"]
-          editpost[0].tags = @params[:post]["tags"]
-          editpost[0].save
-          @message = "Post #{editpost[0].title} successfully updated."
+      if @params[:post] && @params[:post]["submit"] == "Edit"
+        ref = Ink::SqlAdapter.transform_to_sql(@params[:post]["ref"])
+        editpost = Entry.find{ |s| s.where("`#{Entry.primary_key}`=#{ref}") }.
+          first
+        if editpost
+          editpost.update_fields(@params[:post])
+          editpost.save
+          @message = "Post #{editpost.title} successfully updated."
         end
-      elsif @params[:post] and @params[:post]["submit"] == "Delete"
-        ref = @params[:post]["ref"]
-        post = Ink::Database.database.find "entry",
-          "WHERE #{Entry.primary_key}=#{ref}"
-        comments = Ink::Database.database.find_references "entry", ref,
-          "comment"
-        if post[0]
-          comments.each do |c| c.delete end
-          post[0].delete
+      elsif @params[:post] && @params[:post]["submit"] == "Delete"
+        ref = Ink::SqlAdapter.transform_to_sql(@params[:post]["ref"])
+        post = Entry.find{ |s| s.where("`#{Entry.primary_key}`=#{ref}") }.
+          first
+        if post
+          comments = post.find_references(Comment)
+          comments.each{ |c| c.delete }
+          post.delete
           @message =
-            "Post #{post[0].title} with all comments successfully deleted."
+            "Post #{post.title} with all comments successfully deleted."
         end
       end
 
@@ -186,29 +177,31 @@ class Admin < Ink::Controller
     session = User.session_instance(@params)
     self.set_session_data!
     u = User.auth_cookie(session)
-    if u and not u.can? "Comment administrate"
+    if u && !u.can?("Comment administrate")
       render :template => "admin", :locals => [ "Access forbidden" ]
     elsif u
-      @comments = Ink::Database.database.find "comment",
-        "ORDER BY created_at DESC"
+      @comments = u.find_references(Comment) do |s|
+        s.order.by('comment.created_at').desc
+      end
 
       if @params[:post] and @params[:post]["submit"] == "Edit"
-        ref = @params[:post]["ref"]
-        editcomment = Ink::Database.database.find "comment",
-          "WHERE #{Comment.primary_key}=#{ref}"
-        if editcomment[0]
-          editcomment[0].title = @params[:post]["title"]
-          editcomment[0].text = @params[:post]["text"]
-          editcomment[0].save
-          @message = "Comment #{editcomment[0].title} successfully updated."
+        ref = Ink::SqlAdapter.transform_to_sql(@params[:post]["ref"])
+        editcomment = Comment.find do |s|
+          s.where("`#{Comment.primary_key}`=#{ref}")
+        end.first
+        if editcomment
+          editcomment.update_fields(@params[:post])
+          editcomment.save
+          @message = "Comment #{editcomment.title} successfully updated."
         end
-      elsif @params[:post] and @params[:post]["submit"] == "Delete"
-        ref = @params[:post]["ref"]
-        comment = Ink::Database.database.find "comment",
-          "WHERE #{Comment.primary_key}=#{ref}"
-        if comment[0]
-          comment[0].delete
-          @message = "Comment #{comment[0].title} successfully deleted."
+      elsif @params[:post] && @params[:post]["submit"] == "Delete"
+        ref = Ink::SqlAdapter.transform_to_sql(@params[:post]["ref"])
+        comment = Comment.find do |s|
+          s.where("`#{Comment.primary_key}`=#{ref}")
+        end.first
+        if comment
+          comment.delete
+          @message = "Comment #{comment.title} successfully deleted."
         end
       end
 
@@ -225,29 +218,27 @@ class Admin < Ink::Controller
     session = User.session_instance(@params)
     self.set_session_data!
     u = User.auth_cookie(session)
-    if u and not u.can? "User administrate"
+    if u && !u.can?("User administrate")
       render :template => "admin", :locals => [ "Access forbidden" ]
     elsif u
-      @roles = Ink::Database.database.find "role"
+      @roles = Role.find
 
-      if @params[:post] and @params[:post]["submit"]
-        ref = @params[:post]["ref"]
+      if @params[:post] && @params[:post]["submit"]
+        roles = @roles.select{ |r| @params[:post]["ref#{r.pk}"] }
         pass = @params[:post]["pass"]
-        roles = Array.new
-        @roles.each do |r| roles.push(r.pk) if @params[:post]["ref#{r.pk}"] end
-        edituser = Ink::Database.database.find "user",
-          "WHERE #{User.primary_key}=#{ref}"
-        if edituser[0]
-          edituser[0].password = pass if pass.length > 0
-          edituser[0].role = roles
-          edituser[0].save
-          @message = "User #{edituser[0].loginname} successfully updated."
+        ref = Ink::SqlAdapter.transform_to_sql(@params[:post]["ref"])
+        edituser = User.find{ |s| s.where("`#{User.primary_key}`=#{ref}") }.
+          first
+        if edituser
+          edituser.password = pass if pass.length > 0
+          edituser.role = roles
+          edituser.save
+          @message = "User #{edituser.loginname} successfully updated."
         end
       end
 
       @user = u
-      @users = Ink::Database.database.find "user",
-        "WHERE #{User.primary_key}<>#{@user.pk}"
+      @users = User.find{ |s| s.where("#{User.primary_key}<>#{@user.pk}") }
       render :template => "admin",
         :locals => [ render(:partial => "admin/a_users") ]
     else
@@ -260,34 +251,31 @@ class Admin < Ink::Controller
     session = User.session_instance(@params)
     self.set_session_data!
     u = User.auth_cookie(session)
-    if u and not u.can? "Role administrate"
+    if u && !u.can?("Role administrate")
       render :template => "admin", :locals => [ "Access forbidden" ]
     elsif u
-      if @params[:post] and @params[:post]["submit"] == "Edit"
-        ref = @params[:post]["ref"]
-        rolet = @params[:post]["role"]
-        role = Ink::Database.database.find "role",
-          "WHERE #{User.primary_key}=#{ref}"
-        if role[0]
-          role[0].role = rolet
-          role[0].save
-          @message = "Role #{role[0].role} successfully updated."
+      if @params[:post] && @params[:post]["submit"] == "Edit"
+        ref = Ink::SqlAdapter.transform_to_sql(@params[:post]["ref"])
+        role = Role.find{ |s| s.where("#{Role.primary_key}=#{ref}") }.first
+        if role
+          role.role = @params[:post]["role"]
+          role.save
+          @message = "Role #{role.role} successfully updated."
         end
-      elsif @params[:post] and @params[:post]["submit"] == "Delete"
-        ref = @params[:post]["ref"]
-        role = Ink::Database.database.find "role",
-          "WHERE #{User.primary_key}=#{ref}"
-        if role[0]
-          role[0].delete
-          @message = "Role #{role[0].role} successfully deleted."
+      elsif @params[:post] && @params[:post]["submit"] == "Delete"
+        ref = Ink::SqlAdapter.transform_to_sql(@params[:post]["ref"])
+        role = Role.find{ |s| s.where("#{Role.primary_key}=#{ref}") }.first
+        if role
+          role.delete
+          @message = "Role #{role.role} successfully deleted."
         end
       elsif @params[:post] and @params[:post]["submit"] == "Create"
-        role = Role.new "role" => @params[:post]["role"]
+        role = Role.new(@params[:post]["role"])
         role.save
         @message = "Role #{role.role} successfully created."
       end
       @user = u
-      @roles = Ink::Database.database.find "role"
+      @roles = Role.find
       render :template => "admin",
         :locals => [ render(:partial => "admin/a_roles") ]
     else
@@ -300,7 +288,7 @@ class Admin < Ink::Controller
   def login
     if @params[:post] and @params[:post]["submit"]
       # authenticate the user with provided pass
-      u = User.authenticate @params[:post]["user"], @params[:post]["pass"]
+      u = User.authenticate(@params[:post]["user"], @params[:post]["pass"])
       if u
         # create a session and save the session_id to the user
         session = User.session_instance @params
@@ -312,7 +300,7 @@ class Admin < Ink::Controller
         # provide enough for self.set_session_data! to set the
         # necessary variables
         # only use path_to and link_to for generating URIs
-        if not @params[:post].has_key? "cookies_enabled"
+        if not @params[:post].has_key?("cookies_enabled")
           @params[:cookie].delete("_session_id")
           @params[:header].delete("_session_id")
           @params[:post]["_session_id"] = session
@@ -326,9 +314,9 @@ class Admin < Ink::Controller
 
   def logout
     session = User.session_instance(@params)
-    @params[:get].delete "_session_id"
-    @params[:cookie].delete "_session_id"
-    @params[:header].delete "Set-Cookie"
+    @params[:get].delete("_session_id")
+    @params[:cookie].delete("_session_id")
+    @params[:header].delete("Set-Cookie")
     self.set_session_data!
     u = User.auth_cookie(session)
     if u
@@ -339,7 +327,7 @@ class Admin < Ink::Controller
   end
 
   def register
-    if @params[:post] and @params[:post]["submit"]
+    if @params[:post] && @params[:post]["submit"]
       user = @params[:post]["user"]
       pass = @params[:post]["pass"]
 
@@ -351,39 +339,28 @@ class Admin < Ink::Controller
         "salt" => ""
       )
       u.password = pass
-      u.role = Array.new
-      allusers = Ink::Database.database.query(
-        "SELECT count(*) as `count` FROM user;")
-      allroles = Ink::Database.database.query(
-        "SELECT count(*) as `count` FROM role;")
+
+      allusers = Ink::R.select.count!('*').from(User.table_name).to_a.first
+      allroles = Ink::R.select.count!('*').from(Role.table_name).to_a.first
       # if there are no users, make a user superadmin, or just
       # allow Comments
-      if allusers.length > 0 and allusers[0]["count"] == 0
+      if allusers && allusers[0] == 0
         # make superadmin
-        if allroles.length > 0 and allroles[0]["count"] == 0
-          r1 = Role.new "role" => "Post new"
-          r1.save
-          r2 = Role.new "role" => "Post edit"
-          r2.save
-          r3 = Role.new "role" => "Post delete"
-          r3.save
-          r4 = Role.new "role" => "Comment"
-          r4.save
-          r5 = Role.new "role" => "Comment administrate"
-          r5.save
-          r6 = Role.new "role" => "User administrate"
-          r6.save
-          r7 = Role.new "role" => "Role administrate"
-          r7.save
-          r8 = Role.new "role" => "Post administrate"
-          r8.save
+        if allroles && allroles[0] == 0
+          ["Post new", "Post edit", "Post delete", "Comment",
+            "Comment administrate", "User administrate", "Role administrate",
+            "Post administrate"].each do |name|
+
+            r = Role.new(name)
+            r.save
+          end
         end
 
-        roles = Ink::Database.database.find "role"
-        roles.each do |r| u.role.push r end
+        roles = Role.find
+        u.role = roles
       else
-        r = Ink::Database.database.find "role", "WHERE role=\"Comment\""
-        u.role.push r[0] if r[0]
+        r = Role.find{ |s| s.where('role="Comment"') }.first
+        u.role = r if r
       end
 
       u.save
