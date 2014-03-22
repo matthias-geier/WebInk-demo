@@ -15,9 +15,9 @@ of **webinkforms** to show the basic framework capabilities.
 
 ## Using the demo blog
 
-The blog is available under http://localhost:3000/rblog unless configured
+The blog is available under *http://localhost:3000/rblog* unless configured
 differently and the admin interface responds to
-http://localhost:3000/rblog/admin
+*http://localhost:3000/rblog/admin*
 A new user automatically receives the commenter role unless it is the first
 user ever, which is raised to the awesome admin status and can promote, demote
 and administrate.
